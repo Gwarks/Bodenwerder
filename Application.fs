@@ -39,7 +39,11 @@ type Interface()=
                 (src, typ)
             ) |> List.ofSeq
         new Engine.ShaderProgram(shaderList)
-    member Me.createVertexArray(attributes: System.Collections.Generic.IList<obj>, vertexCount:int) =
+    member Me.createVertexArray(attributes: System.Collections.Generic.IList<obj>, vertexs:System.Collections.Generic.IList<byte>) =
+        let arr = 
+            match vertexs with
+            | :? (byte[]) as a -> a // Falls es schon ein Array ist
+            | _ -> System.Linq.Enumerable.ToArray(vertexs) // Ansonsten konvertieren
         let attrList =
             attributes
             |> Seq.map (fun item ->
@@ -50,7 +54,7 @@ type Interface()=
                 let loc = parts.[3] :?> int
                 (name, typ, size, loc)
             ) |> List.ofSeq
-        new Engine.VertexArray(attrList, vertexCount)
+        new Engine.VertexArray(attrList, arr)
     member Me.getConfigPath()=
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData)
     member Me.ShaderType = (

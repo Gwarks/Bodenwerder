@@ -8,8 +8,6 @@ open System.ComponentModel
 open System.Threading
 open OpenTK.Windowing.GraphicsLibraryFramework
 
-open OpenTK.Graphics.OpenGL4
-
 type ShaderProgram(shaderz:list<string*ShaderType>)=
     let mutable shaderProgram=0
     do 
@@ -89,11 +87,15 @@ type Texture()=
     override Me.Finalize()=
         GL.DeleteTexture(texture)
 
-type VertexArray(attributes:(string * ActiveAttribType * int * int) list, vertexCount:int)=
+type VertexArray(attributes:(string * ActiveAttribType * int * int) list, vertexs:System.Collections.Generic.IList<byte>)=
     let mutable vao=0
     let mutable vbo=0
     let mutable stride=0
     do
+        let vertexs = 
+            match vertexs with
+            | :? (byte[]) as a -> a
+            | _ -> System.Linq.Enumerable.ToArray(vertexs)
         vao <- GL.GenVertexArray()
         vbo <- GL.GenBuffer()
         GL.BindVertexArray(vao)
@@ -102,8 +104,9 @@ type VertexArray(attributes:(string * ActiveAttribType * int * int) list, vertex
         for (_,typ,_,_) in attributes do
             let l = Tools.attribLayout typ
             stride <- stride + (l.Locations * l.Components * 4)
-        
-        GL.BufferData(BufferTarget.ArrayBuffer, vertexCount * stride, System.IntPtr.Zero, BufferUsageHint.StaticDraw)
+        let vertexCount = vertexs.Length / stride
+
+        GL.BufferData(BufferTarget.ArrayBuffer, vertexs.Length, vertexs, BufferUsageHint.StaticDraw)
         
         let mutable offset = 0
         for (_,typ,_,location) in attributes do
@@ -117,18 +120,10 @@ type VertexArray(attributes:(string * ActiveAttribType * int * int) list, vertex
                     GL.EnableVertexAttribArray(location)
                     offset <- offset + (l.Components * 4)
         
-        GL.BindVertexArray(0)
+        GL.BindVertexArray(0)        
         GL.BindBuffer(BufferTarget.ArrayBuffer, 0)
-    member Me.activate()=
+    member Me.activate():unit=
         GL.BindVertexArray(vao)
-    member Me.copy(data:System.Collections.Generic.IList<byte>)=
-        let data = 
-            match data with
-            | :? (byte[]) as a -> a
-            | _ -> System.Linq.Enumerable.ToArray(data)
-        GL.BindBuffer(BufferTarget.ArrayBuffer, vbo)
-        GL.BufferSubData(BufferTarget.ArrayBuffer, nativeint 0, data.Length, data)
-        GL.BindBuffer(BufferTarget.ArrayBuffer, 0)
     override Me.Finalize()=
         GL.DeleteBuffer(vbo)
         GL.DeleteVertexArray(vao)

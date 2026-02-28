@@ -90,31 +90,21 @@ void main()
 }
 """,ShaderType.FragmentShader)
         ])
-    let vao = GL.GenVertexArray()
-    let vbo = GL.GenBuffer()
-    do
-        let vertices =
-            [|
+    let va =
+        let v = [|
                0.0f ; 0.0f // Top-Left
                0.0f ; 1.0f // Bottom-left
                1.0f ; 1.0f // Bottom-right
                1.0f ; 0.0f // Top-right
-               |]    
-        GL.BindVertexArray(vao)
-        GL.BindBuffer(BufferTarget.ArrayBuffer, vbo)
-        GL.BufferData(BufferTarget.ArrayBuffer, vertices.Length * sizeof<float32>, vertices, BufferUsageHint.StaticDraw)
-        GL.VertexAttribPointer(0, 2, VertexAttribPointerType.Float, false, 2 * sizeof<float32>, 0)
-        GL.EnableVertexAttribArray(0)
-        GL.BindBuffer(BufferTarget.ArrayBuffer, 0)
-        GL.BindVertexArray(0)
+               |]
+        let b = Array.zeroCreate<byte> (v.Length * sizeof<float32>)
+        System.Buffer.BlockCopy(v, 0, b, 0, b.Length)
+        VertexArray(shaderProgram.getActiveAttributes(),b)
     member public Me.render (texture:Texture,pos:Vector2i,client:Vector2i) =
         shaderProgram.activate()
         GL.Uniform2(shaderProgram.UniformLocation("base"),((float32 pos.X)*2.0f)/(float32 client.X)-1.0f,1.0f-((float32 pos.Y)*2.0f)/(float32 client.Y));
         GL.Uniform2(shaderProgram.UniformLocation("delta"),((float32 texture.Size.X)*2.0f)/(float32 client.X),((float32 texture.Size.Y)*(-2.0f))/(float32 client.Y));
         texture.activate()
-        GL.BindVertexArray(vao)
+        va.activate()
         GL.DrawArrays(PrimitiveType.TriangleFan, 0, 4)
-    override Me.Finalize()=
-        GL.DeleteBuffer(vbo)
-        GL.DeleteVertexArray(vao)
 let getTextureQuad=Tools.WeakSingleton.get<TextureQuad>
