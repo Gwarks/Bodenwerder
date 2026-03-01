@@ -1,6 +1,5 @@
 import Interface as I
-import Vector2i
-import itertools
+import itertools,struct
 
 class BasicInput:
     def __init__(Me,keys):
@@ -38,35 +37,66 @@ class BasicInputConfigurator:
         if not Me.currentkey:
             Me.onFinish(BasicInput({v[0]:k for k,v in Me.set_keys.items()}))
     def onRender(Me,size):
-        Me.tq.render(Me.t_title,Vector2i((size.X-Me.t_title.Size.X)>>1,0),size)
+        Me.tq.render(Me.t_title,I.Vector2i((size.X-Me.t_title.Size.X)>>1,0),size)
         py=Me.t_title.Size.Y+4
         for i,key in enumerate(Me.keys):
             t=Me.t_keys[i]
-            Me.tq.render(t,Vector2i((size.X>>1)-t.Size.X-4,py),size)
+            Me.tq.render(t,I.Vector2i((size.X>>1)-t.Size.X-4,py),size)
             if key in Me.set_keys:
                 tk=Me.set_keys[key][1]
-                Me.tq.render(tk,Vector2i((size.X>>1)+4,py),size)
+                Me.tq.render(tk,I.Vector2i((size.X>>1)+4,py),size)
             elif Me.currentkey==key:
-                Me.tq.render(Me.t_presskey,Vector2i((size.X>>1)+4,py),size)           
+                Me.tq.render(Me.t_presskey,I.Vector2i((size.X>>1)+4,py),size)           
             py+=t.Size.Y      
 
 class Paint:
     def __init__(Me):
         Me.tq=I.getTextureQuad()        
-        tr=I.getTextRenderer(128.0)
-        Me.t=I.createTextureRGBA(256,256,bytes(bytearray(itertools.chain.from_iterable((x,y,0,255) for y in range(256) for x in range(256)))))
-        Me.pos=Vector2i(0,0)
+        Me.t=I.createTextureRGBA(256,256,bytes(itertools.chain.from_iterable((x,y,0,255) for y in range(256) for x in range(256))))
+        Me.pos=I.Vector2i(0,0)
         Me.cur=0
+        Me.sp=I.createShaderProgram([("""
+#version 330 core
+in vec2 aPosition;
+in vec3 aColor;
+out vec3 Color;
+void main()
+{
+    gl_Position = vec4(aPosition,0.0,1.0);
+    Color = aColor;
+}
+""",I.ShaderType['VertexShader'])
+     ,   ("""
+#version 330 core
+in vec3 Color;
+out vec4 FragColor;
+void main()
+{
+    FragColor = vec4(Color,1.0);
+}
+""",I.ShaderType['FragmentShader'])
+])
+        b=b''.join(
+            struct.pack('=ff fff',*f) for f in (
+     ( 0.5, -0.5,   1.0, 0.0, 0.0 ),
+     (-0.5, -0.5,   0.0, 1.0, 0.0 ),
+     ( 0.0,  0.5,   0.0, 0.0, 1.0 ),
+            )
+        )
+        Me.va=I.createVertexArray(Me.sp.getActiveAttributes(),b,I.PrimitiveType['TriangleFan'])
+
     def onRender(Me,size):
-        Me.tq.render(Me.t,Me.pos,size)
+        #Me.tq.render(Me.t,Me.pos,size)
+        Me.sp.activate()
+        Me.va.draw()
     def Left(Me):
-        Me.pos+=Vector2i(-1,0)
+        Me.pos+=I.Vector2i(-1,0)
     def Right(Me):
-        Me.pos+=Vector2i(1,0)
+        Me.pos+=I.Vector2i(1,0)
     def Up(Me):
-        Me.pos+=Vector2i(0,-1)
+        Me.pos+=I.Vector2i(0,-1)
     def Down(Me):
-        Me.pos+=Vector2i(0,1)
+        Me.pos+=I.Vector2i(0,1)
     def Action(Me):
         Me.cur=1
     def Back(Me):
@@ -80,29 +110,3 @@ def onCompleteConfig(bi):
 bi=BasicInputConfigurator(onCompleteConfig)
 onKeyDown=bi.onKeyDown
 onRender=bi.onRender
-print(I.createShaderProgram([("""
-#version 330 core
-in vec2 aPosition;
-in mat4x3 aTest;
-in mat3x4 aTest2;
-out vec2 TexCoord;
-uniform vec2 base;
-uniform vec2 delta;
-void main()
-{
-    //gl_Position = vec4(aPosition*vec2(2.0,-2.0)+vec2(-1.0,1.0), 0.0, 1.0);
-    gl_Position = vec4(aPosition*delta+base, 0.0, 1.0)*aTest2*aTest;
-    TexCoord = aPosition;
-}
-""",I.ShaderType['VertexShader'])
-     ,   ("""
-#version 330 core
-in vec2 TexCoord;
-out vec4 FragColor;
-uniform sampler2D texture1;
-void main()
-{
-    FragColor = texture(texture1, TexCoord);
-}
-""",I.ShaderType['FragmentShader'])
-]).getActiveAttributes())

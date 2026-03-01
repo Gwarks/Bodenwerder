@@ -99,12 +99,11 @@ void main()
                |]
         let b = Array.zeroCreate<byte> (v.Length * sizeof<float32>)
         System.Buffer.BlockCopy(v, 0, b, 0, b.Length)
-        VertexArray(shaderProgram.getActiveAttributes(),b)
+        VertexArray(shaderProgram.getActiveAttributes(),b,PrimitiveType.TriangleFan)
     member public Me.render (texture:Texture,pos:Vector2i,client:Vector2i) =
         shaderProgram.activate()
         GL.Uniform2(shaderProgram.UniformLocation("base"),((float32 pos.X)*2.0f)/(float32 client.X)-1.0f,1.0f-((float32 pos.Y)*2.0f)/(float32 client.Y));
         GL.Uniform2(shaderProgram.UniformLocation("delta"),((float32 texture.Size.X)*2.0f)/(float32 client.X),((float32 texture.Size.Y)*(-2.0f))/(float32 client.Y));
         texture.activate()
-        va.activate()
-        GL.DrawArrays(PrimitiveType.TriangleFan, 0, 4)
+        va.draw()        
 let getTextureQuad=Tools.WeakSingleton.get<TextureQuad>

@@ -19,18 +19,28 @@ type ShaderProgram(shaderz:list<string*ShaderType>)=
             let mutable compileStatus=0
             GL.GetShader(shader,ShaderParameter.CompileStatus,&compileStatus)
             if compileStatus<>1 then
-                failwith "Shader compilation failed."
+                let info = GL.GetShaderInfoLog(shader)
+                failwith (sprintf "Shader compilation failed. Type: %A\nLog: %s" typ info)
             GL.AttachShader(shaderProgram,shader)
             GL.LinkProgram(shaderProgram)
             GL.DeleteShader(shader)
         let mutable linkStatus=0
         GL.GetProgram(shaderProgram,GetProgramParameterName.LinkStatus,&linkStatus)
         if linkStatus<>1 then
-            failwith "Shader program linking failed."
+            let info = GL.GetProgramInfoLog(shaderProgram)
+            failwith (sprintf "Shader program linking failed.\nLog: %s" info)
     member Me.activate():unit=
         GL.UseProgram(shaderProgram)
     member Me.UniformLocation(name:string):int=
-         GL.GetUniformLocation(shaderProgram,name);        
+         GL.GetUniformLocation(shaderProgram,name)
+    member Me.SetUniform(name:string, value:int) = GL.Uniform1(Me.UniformLocation(name), value)
+    member Me.SetUniform(name:string, value:float32) = GL.Uniform1(Me.UniformLocation(name), value)
+    member Me.SetUniform(name:string, value:Vector2) = GL.Uniform2(Me.UniformLocation(name), value)
+    member Me.SetUniform(name:string, value:Vector3) = GL.Uniform3(Me.UniformLocation(name), value)
+    member Me.SetUniform(name:string, value:Vector4) = GL.Uniform4(Me.UniformLocation(name), value)
+    member Me.SetUniform(name:string, value:Matrix4) = 
+        let mutable m = value
+        GL.UniformMatrix4(Me.UniformLocation(name), false, &m)
     member Me.getActiveUniforms() : (string * ActiveUniformType * int) list =
         let mutable count = 0
         GL.GetProgram(shaderProgram, GetProgramParameterName.ActiveUniforms, &count)
@@ -87,10 +97,12 @@ type Texture()=
     override Me.Finalize()=
         GL.DeleteTexture(texture)
 
-type VertexArray(attributes:(string * ActiveAttribType * int * int) list, vertexs:System.Collections.Generic.IList<byte>)=
+type VertexArray(attributes:(string * ActiveAttribType * int * int) list, vertexs:System.Collections.Generic.IList<byte>,
+        primitivetype:PrimitiveType)=
     let mutable vao=0
     let mutable vbo=0
     let mutable stride=0
+    let mutable vertexCount=0
     do
         let vertexs = 
             match vertexs with
@@ -104,7 +116,7 @@ type VertexArray(attributes:(string * ActiveAttribType * int * int) list, vertex
         for (_,typ,_,_) in attributes do
             let l = Tools.attribLayout typ
             stride <- stride + (l.Locations * l.Components * 4)
-        let vertexCount = vertexs.Length / stride
+        vertexCount <-vertexs.Length / stride
 
         GL.BufferData(BufferTarget.ArrayBuffer, vertexs.Length, vertexs, BufferUsageHint.StaticDraw)
         
@@ -122,8 +134,10 @@ type VertexArray(attributes:(string * ActiveAttribType * int * int) list, vertex
         
         GL.BindVertexArray(0)        
         GL.BindBuffer(BufferTarget.ArrayBuffer, 0)
-    member Me.activate():unit=
+    member Me.draw():unit=
         GL.BindVertexArray(vao)
+        GL.DrawArrays(primitivetype, 0, vertexCount)
+        GL.BindVertexArray(0)
     override Me.Finalize()=
         GL.DeleteBuffer(vbo)
         GL.DeleteVertexArray(vao)

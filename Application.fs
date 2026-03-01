@@ -39,22 +39,26 @@ type Interface()=
                 (src, typ)
             ) |> List.ofSeq
         new Engine.ShaderProgram(shaderList)
-    member Me.createVertexArray(attributes: System.Collections.Generic.IList<obj>, vertexs:System.Collections.Generic.IList<byte>) =
+    member Me.createVertexArray(attributes: System.Collections.IEnumerable, vertexs:System.Collections.Generic.IList<byte>,primetivetype:PrimitiveType) =
         let arr = 
             match vertexs with
             | :? (byte[]) as a -> a // Falls es schon ein Array ist
             | _ -> System.Linq.Enumerable.ToArray(vertexs) // Ansonsten konvertieren
         let attrList =
             attributes
+            |> Seq.cast<obj>
             |> Seq.map (fun item ->
-                let parts = item :?> System.Collections.Generic.IList<obj>
-                let name = parts.[0] :?> string
-                let typ = parts.[1] :?> ActiveAttribType
-                let size = parts.[2] :?> int
-                let loc = parts.[3] :?> int
-                (name, typ, size, loc)
+                match item with
+                | :? (string * ActiveAttribType * int * int) as t -> t
+                | :? System.Collections.Generic.IList<obj> as parts ->
+                    let name = parts.[0] :?> string
+                    let typ = parts.[1] :?> ActiveAttribType
+                    let size = parts.[2] :?> int
+                    let loc = parts.[3] :?> int
+                    (name, typ, size, loc)
+                | _ -> failwith "Invalid attribute format"
             ) |> List.ofSeq
-        new Engine.VertexArray(attrList, arr)
+        new Engine.VertexArray(attrList, arr, primetivetype)
     member Me.getConfigPath()=
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData)
     member Me.ShaderType = (
@@ -63,6 +67,13 @@ type Interface()=
             let e = v :?> ShaderType
             d.[e.ToString()] <- e
         d)
+    member Me.PrimitiveType = (
+        let d = PythonDictionary()
+        for v in Enum.GetValues(typeof<PrimitiveType>) do
+            let e: PrimitiveType = v :?> PrimitiveType
+            d.[e.ToString()] <- e
+        d)
+    member Me.Vector2i = typeof<Vector2i>
 
 let testPython():Engine.EngineCallbacks=
     let engine=Python.CreateEngine()
@@ -71,7 +82,6 @@ let testPython():Engine.EngineCallbacks=
     let sys = Python.GetSysModule(engine)
     let modules = sys.GetVariable<System.Collections.Generic.IDictionary<string, obj>>("modules")
     modules.["Interface"] <- Interface()
-    modules.["Vector2i"] <- typeof<Vector2i>
 
     engine.ExecuteFile(Path.Combine(Path.GetDirectoryName System.Environment.ProcessPath,"lt.cmdr.data","main.py"),scope)|>ignore
     let onRender(size:Vector2i)=
