@@ -13,7 +13,7 @@ let private image2texture(image:SKImage):Texture=
         printfn "ARRAY FAILED"
     pinned.Free()
     let texture = Texture()
-    texture.RGBAfromByteArray(image.Width,image.Height,texData)
+    texture.LoadFromByteArray(image.Width, image.Height, 4, texData)
     texture
 
 (*
@@ -104,6 +104,7 @@ void main()
         shaderProgram.activate()
         GL.Uniform2(shaderProgram.UniformLocation("base"),((float32 pos.X)*2.0f)/(float32 client.X)-1.0f,1.0f-((float32 pos.Y)*2.0f)/(float32 client.Y));
         GL.Uniform2(shaderProgram.UniformLocation("delta"),((float32 texture.Size.X)*2.0f)/(float32 client.X),((float32 texture.Size.Y)*(-2.0f))/(float32 client.Y));
-        texture.activate()
+        texture.activate(0)
+        shaderProgram.SetUniform("texture1", 0)
         va.draw()        
 let getTextureQuad=Tools.WeakSingleton.get<TextureQuad>

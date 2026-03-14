@@ -52,7 +52,7 @@ class BasicInputConfigurator:
 class Paint:
     def __init__(Me):
         Me.tq=I.getTextureQuad()        
-        Me.t=I.createTextureRGBA(256,256,bytes(itertools.chain.from_iterable((x,y,0,255) for y in range(256) for x in range(256))))
+        Me.t=I.createTexture(256,256,4,bytes(itertools.chain.from_iterable((x,y,0,255) for y in range(256) for x in range(256))))
         Me.pos=I.Vector2i(0,0)
         Me.cur=0
         Me.sp=I.createShaderProgram([("""
@@ -84,11 +84,10 @@ void main()
             )
         )
         Me.va=I.createVertexArray(Me.sp.getActiveAttributes(),b,I.PrimitiveType['TriangleFan'])
-
     def onRender(Me,size):
-        #Me.tq.render(Me.t,Me.pos,size)
         Me.sp.activate()
         Me.va.draw()
+        Me.tq.render(Me.t,Me.pos,size)
     def Left(Me):
         Me.pos+=I.Vector2i(-1,0)
     def Right(Me):

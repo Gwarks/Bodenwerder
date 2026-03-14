@@ -18,7 +18,7 @@ type Interface()=
         Engine.Canvas.getTextureQuad()
     member this.PrintMessage(message: string)=
         printfn "F# object received message: %s" message
-    member Me.createTextureRGBA(width:int, height:int, texels:System.Collections.Generic.IList<byte>) =
+    member Me.createTexture(width:int, height:int, channels:int, texels:System.Collections.Generic.IList<byte>) =
         let texture = Engine.Texture()
         // IronPython übergibt 'bytes'/'bytearray' als IList<byte>.
         // Wir müssen es in ein für OpenGL passendes byte[] konvertieren.
@@ -26,7 +26,7 @@ type Interface()=
             match texels with
             | :? (byte[]) as a -> a // Falls es schon ein Array ist
             | _ -> System.Linq.Enumerable.ToArray(texels) // Ansonsten konvertieren
-        texture.RGBAfromByteArray(width, height, arr)
+        texture.LoadFromByteArray(width, height, channels, arr)
         texture
     member Me.createShaderProgram(shaders: System.Collections.Generic.IList<obj>) =
         let shaderList =

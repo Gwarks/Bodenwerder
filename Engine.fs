@@ -76,23 +76,31 @@ type Texture()=
         GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, int All.Nearest)
         GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, int All.Nearest)
     member Me.Size=size
-    member Me.RGBAfromByteArray(width:int,height:int,texels:array<byte>)=
+    member Me.LoadFromByteArray(width:int, height:int, channels:int, texels:array<byte>)=
+        let internalFormat, pixelFormat = 
+            match channels with
+            | 1 -> PixelInternalFormat.R8, PixelFormat.Red
+            | 2 -> PixelInternalFormat.Rg8, PixelFormat.Rg
+            | 3 -> PixelInternalFormat.Rgb8, PixelFormat.Rgb
+            | 4 -> PixelInternalFormat.Rgba, PixelFormat.Rgba
+            | _ -> failwithf "Unsupported channel count: %d" channels
         GL.BindTexture(TextureTarget.Texture2D, texture)
         GL.PixelStore(PixelStoreParameter.UnpackAlignment, 1)
         GL.TexImage2D(
             TextureTarget.Texture2D,
             0,
-            PixelInternalFormat.Rgba,
+            internalFormat,
             width,
             height,
             0,
-            PixelFormat.Rgba,
+            pixelFormat,
             PixelType.UnsignedByte,
             texels
         )
         size.X<-width
         size.Y<-height
-    member Me.activate():unit=
+    member Me.activate(unit:int):unit=
+        GL.ActiveTexture(enum<TextureUnit>(int TextureUnit.Texture0 + unit))
         GL.BindTexture(TextureTarget.Texture2D, texture)
     override Me.Finalize()=
         GL.DeleteTexture(texture)
