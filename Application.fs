@@ -49,13 +49,12 @@ type Interface()=
             |> Seq.cast<obj>
             |> Seq.map (fun item ->
                 match item with
-                | :? (string * ActiveAttribType * int * int) as t -> t
+                | :? (ActiveAttribType * int * int) as t -> t
                 | :? System.Collections.Generic.IList<obj> as parts ->
-                    let name = parts.[0] :?> string
-                    let typ = parts.[1] :?> ActiveAttribType
-                    let size = parts.[2] :?> int
-                    let loc = parts.[3] :?> int
-                    (name, typ, size, loc)
+                    let typ = parts.[0] :?> ActiveAttribType
+                    let size = parts.[1] :?> int
+                    let loc = parts.[2] :?> int
+                    (typ, size, loc)
                 | _ -> failwith "Invalid attribute format"
             ) |> List.ofSeq
         new Engine.VertexArray(attrList, arr, primetivetype)

@@ -41,27 +41,27 @@ type ShaderProgram(shaderz:list<string*ShaderType>)=
     member Me.SetUniform(name:string, value:Matrix4) = 
         let mutable m = value
         GL.UniformMatrix4(Me.UniformLocation(name), false, &m)
-    member Me.getActiveUniforms() : (string * ActiveUniformType * int) list =
+    member Me.getActiveUniforms() =
         let mutable count = 0
         GL.GetProgram(shaderProgram, GetProgramParameterName.ActiveUniforms, &count)
-        [
-            for i in 0 .. count - 1 do
-                let mutable size = 0
-                let mutable typ = ActiveUniformType.Bool
-                let name = GL.GetActiveUniform(shaderProgram, i, &size, &typ)
-                (name, typ, size)
-        ]
-    member Me.getActiveAttributes() : (string * ActiveAttribType * int * int) list =
+        let dict = System.Collections.Generic.Dictionary<string, ActiveUniformType * int>()
+        for i in 0 .. count - 1 do
+            let mutable size = 0
+            let mutable typ = ActiveUniformType.Bool
+            let name = GL.GetActiveUniform(shaderProgram, i, &size, &typ)
+            dict.Add(name, (typ, size))
+        dict
+    member Me.getActiveAttributes() =
         let mutable count = 0
         GL.GetProgram(shaderProgram, GetProgramParameterName.ActiveAttributes, &count)
-        [
-            for i in 0 .. count - 1 do
-                let mutable size = 0
-                let mutable typ = ActiveAttribType.Float
-                let name = GL.GetActiveAttrib(shaderProgram, i, &size, &typ)
-                let location = GL.GetAttribLocation(shaderProgram, name)
-                (name, typ, size, location)
-        ]
+        let dict = System.Collections.Generic.Dictionary<string, ActiveAttribType * int * int>()
+        for i in 0 .. count - 1 do
+            let mutable size = 0
+            let mutable typ = ActiveAttribType.Float
+            let name = GL.GetActiveAttrib(shaderProgram, i, &size, &typ)
+            let location = GL.GetAttribLocation(shaderProgram, name)
+            dict.Add(name, (typ, size, location))
+        dict
     override Me.Finalize()=
         GL.DeleteProgram(shaderProgram)
 
@@ -105,7 +105,7 @@ type Texture()=
     override Me.Finalize()=
         GL.DeleteTexture(texture)
 
-type VertexArray(attributes:(string * ActiveAttribType * int * int) list, vertexs:System.Collections.Generic.IList<byte>,
+type VertexArray(attributes:(ActiveAttribType * int * int) list, vertexs:System.Collections.Generic.IList<byte>,
         primitivetype:PrimitiveType)=
     let mutable vao=0
     let mutable vbo=0
@@ -121,24 +121,26 @@ type VertexArray(attributes:(string * ActiveAttribType * int * int) list, vertex
         GL.BindVertexArray(vao)
         GL.BindBuffer(BufferTarget.ArrayBuffer, vbo)
         
-        for (_,typ,_,_) in attributes do
+        for (typ,size,_) in attributes do
             let l = Tools.attribLayout typ
-            stride <- stride + (l.Locations * l.Components * 4)
+            stride <- stride + (l.Locations * l.Components * 4 * size)
         vertexCount <-vertexs.Length / stride
 
         GL.BufferData(BufferTarget.ArrayBuffer, vertexs.Length, vertexs, BufferUsageHint.StaticDraw)
         
         let mutable offset = 0
-        for (_,typ,_,location) in attributes do
+        for (typ,size,location) in attributes do
             let l = Tools.attribLayout typ
             if location >= 0 then
-                for i in 0 .. l.Locations - 1 do
-                    if l.IsInteger then
-                        GL.VertexAttribIPointer(location + i, l.Components, enum<VertexAttribIntegerType> (int l.BaseType), stride, nativeint offset)
-                    else
-                        GL.VertexAttribPointer(location + i, l.Components, l.BaseType, false, stride, offset)
-                    GL.EnableVertexAttribArray(location)
-                    offset <- offset + (l.Components * 4)
+                for s in 0 .. size - 1 do
+                    for i in 0 .. l.Locations - 1 do
+                        let loc = location + (s * l.Locations) + i
+                        if l.IsInteger then
+                            GL.VertexAttribIPointer(loc, l.Components, enum<VertexAttribIntegerType> (int l.BaseType), stride, nativeint offset)
+                        else
+                            GL.VertexAttribPointer(loc, l.Components, l.BaseType, false, stride, offset)
+                        GL.EnableVertexAttribArray(loc)
+                        offset <- offset + (l.Components * 4)
         
         GL.BindVertexArray(0)        
         GL.BindBuffer(BufferTarget.ArrayBuffer, 0)

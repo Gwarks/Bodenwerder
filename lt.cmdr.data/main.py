@@ -83,7 +83,8 @@ void main()
      ( 0.0,  0.5,   0.0, 0.0, 1.0 ),
             )
         )
-        Me.va=I.createVertexArray(Me.sp.getActiveAttributes(),b,I.PrimitiveType['TriangleFan'])
+        aa=Me.sp.getActiveAttributes()
+        Me.va=I.createVertexArray([aa[x] for x in ('aPosition','aColor')],b,I.PrimitiveType['TriangleFan'])
     def onRender(Me,size):
         Me.sp.activate()
         Me.va.draw()

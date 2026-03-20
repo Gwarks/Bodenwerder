@@ -99,7 +99,7 @@ void main()
                |]
         let b = Array.zeroCreate<byte> (v.Length * sizeof<float32>)
         System.Buffer.BlockCopy(v, 0, b, 0, b.Length)
-        VertexArray(shaderProgram.getActiveAttributes(),b,PrimitiveType.TriangleFan)
+        VertexArray(shaderProgram.getActiveAttributes().Values |> Seq.toList,b,PrimitiveType.TriangleFan)
     member public Me.render (texture:Texture,pos:Vector2i,client:Vector2i) =
         shaderProgram.activate()
         GL.Uniform2(shaderProgram.UniformLocation("base"),((float32 pos.X)*2.0f)/(float32 client.X)-1.0f,1.0f-((float32 pos.Y)*2.0f)/(float32 client.Y));
