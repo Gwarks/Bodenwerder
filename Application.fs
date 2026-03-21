@@ -76,6 +76,12 @@ type Interface()=
         d)
     member Me.Vector2i = typeof<Vector2i>
     member Me.Color4 = typeof<Color4>
+    member Me.Keys = (
+        let d = PythonDictionary()
+        for v in Enum.GetValues(typeof<Keys>) do
+            let e = v :?> Keys
+            d.[e.ToString()] <- e
+        d)
 
 let loadMain():Engine.EngineCallbacks=
     let engine=Python.CreateEngine()

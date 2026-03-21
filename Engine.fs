@@ -44,24 +44,22 @@ type ShaderProgram(shaderz:list<string*ShaderType>)=
     member Me.getActiveUniforms() =
         let mutable count = 0
         GL.GetProgram(shaderProgram, GetProgramParameterName.ActiveUniforms, &count)
-        let dict = System.Collections.Generic.Dictionary<string, ActiveUniformType * int>()
-        for i in 0 .. count - 1 do
-            let mutable size = 0
-            let mutable typ = ActiveUniformType.Bool
-            let name = GL.GetActiveUniform(shaderProgram, i, &size, &typ)
-            dict.Add(name, (typ, size))
-        dict
+        System.Collections.Generic.Dictionary(
+            Seq.init count (fun i ->
+                let mutable size, typ = 0, ActiveUniformType.Bool
+                let name = GL.GetActiveUniform(shaderProgram, i, &size, &typ)
+                System.Collections.Generic.KeyValuePair(name, (typ, size)))
+        )
     member Me.getActiveAttributes() =
         let mutable count = 0
         GL.GetProgram(shaderProgram, GetProgramParameterName.ActiveAttributes, &count)
-        let dict = System.Collections.Generic.Dictionary<string, ActiveAttribType * int * int>()
-        for i in 0 .. count - 1 do
-            let mutable size = 0
-            let mutable typ = ActiveAttribType.Float
-            let name = GL.GetActiveAttrib(shaderProgram, i, &size, &typ)
-            let location = GL.GetAttribLocation(shaderProgram, name)
-            dict.Add(name, (typ, size, location))
-        dict
+        System.Collections.Generic.Dictionary(
+            Seq.init count (fun i ->
+                let mutable size, typ = 0, ActiveAttribType.Float
+                let name = GL.GetActiveAttrib(shaderProgram, i, &size, &typ)
+                let location = GL.GetAttribLocation(shaderProgram, name)
+                System.Collections.Generic.KeyValuePair(name, (typ, size, location)))
+        )
     override Me.Finalize()=
         GL.DeleteProgram(shaderProgram)
 
