@@ -79,13 +79,18 @@ type Interface()=
 
 let loadMain():Engine.EngineCallbacks=
     let engine=Python.CreateEngine()
+    let dataPath = Path.Combine(Path.GetDirectoryName System.Environment.ProcessPath, "lt.cmdr.data")
+    let searchPaths = engine.GetSearchPaths()
+    searchPaths.Add(dataPath)
+    engine.SetSearchPaths(searchPaths)
+
     let scope=engine.CreateScope()
 
     let sys = Python.GetSysModule(engine)
     let modules = sys.GetVariable<System.Collections.Generic.IDictionary<string, obj>>("modules")
     modules.["Interface"] <- Interface()
 
-    engine.ExecuteFile(Path.Combine(Path.GetDirectoryName System.Environment.ProcessPath,"lt.cmdr.data","main.py"),scope)|>ignore
+    engine.ExecuteFile(Path.Combine(dataPath, "main.py"), scope) |> ignore
     let onRender(size:Vector2i)=
         GL.Clear(ClearBufferMask.ColorBufferBit)    
         scope.GetVariable<Func<Vector2i,unit>>("onRender").Invoke(size)
