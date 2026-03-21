@@ -12,3 +12,40 @@ Bodenwerder ist eine Grafik-Engine, die auf F# und OpenTK basiert. Sie integrier
 ## Coding Style
 
 Me project use Me instead of this.
+
+## Python Interface API
+
+Das Modul `Interface` (in Python oft als `I` importiert) stellt Funktionen für Rendering und Ressourcenmanagement bereit.
+
+### Basisfunktionen
+
+*   `getTextRenderer(size: float) -> TextRenderer`: Erstellt einen Renderer für Text in der angegebenen Größe.
+*   `getTextureQuad() -> TextureQuad`: Liefert ein Objekt zum Zeichnen von 2D-Texturen.
+*   `createTexture(width: int, height: int, channels: int, texels: bytes) -> Texture`: Erstellt eine Textur aus Byte-Daten.
+*   `createShaderProgram(shaders: list) -> ShaderProgram`: Erstellt ein Shader-Programm. Erwartet eine Liste von Tupeln `(SourceCode, ShaderType)`.
+*   `createVertexArray(attributes: list|dict, vertices: bytes, primitive_type: PrimitiveType) -> VertexArray`: Erstellt ein Vertex-Array (VAO) aus Attribut-Definitionen und Vertex-Daten.
+*   `getConfigPath() -> string`: Liefert den Pfad zum AppData-Verzeichnis.
+*   `setBackgroundColor(color: Color4)`: Setzt die Clear-Color des Fensters.
+
+### Typen und Konstanten
+
+*   `Vector2i`: OpenTK Vektor (Integer).
+*   `Color4`: OpenTK Farbe.
+*   `ShaderType`: Mapping von Shadertypen (z.B. `I.ShaderType['VertexShader']`).
+*   `PrimitiveType`: Mapping von Primitiven (z.B. `I.PrimitiveType['TriangleFan']`).
+
+### Klassen
+
+**TextRenderer**
+*   `renderText(text: string) -> Texture`: Rendert Text in eine Textur.
+
+**TextureQuad**
+*   `render(texture: Texture, pos: Vector2i, window_size: Vector2i)`: Zeichnet eine Textur an einer Bildschirmposition.
+
+**ShaderProgram**
+*   `activate()`: Aktiviert den Shader.
+*   `SetUniform(name: string, value)`: Setzt Uniforms (unterstützt `int`, `float`, `Vector2/3/4`, `Matrix4`).
+*   `getActiveAttributes() -> dict`: Liefert aktive Attribute für `createVertexArray`.
+
+**VertexArray**
+*   `draw()`: Führt den Draw-Call aus.
