@@ -33,6 +33,7 @@ Das Modul `Interface` (in Python oft als `I` importiert) stellt Funktionen für 
 *   `Color4`: OpenTK Farbe.
 *   `ShaderType`: Mapping von Shadertypen (z.B. `I.ShaderType['VertexShader']`).
 *   `PrimitiveType`: Mapping von Primitiven (z.B. `I.PrimitiveType['TriangleFan']`).
+*   `Keys`: Mapping von Tastaturtasten (z.B. `I.Keys['Space']`).
 
 ### Klassen
 

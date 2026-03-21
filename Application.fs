@@ -16,8 +16,6 @@ type Interface()=
         Engine.Canvas.TextRenderer(size)
     member Me.getTextureQuad()=
         Engine.Canvas.getTextureQuad()
-    member this.PrintMessage(message: string)=
-        printfn "F# object received message: %s" message
     member Me.createTexture(width:int, height:int, channels:int, texels:System.Collections.Generic.IList<byte>) =
         let texture = Engine.Texture()
         // IronPython übergibt 'bytes'/'bytearray' als IList<byte>.
