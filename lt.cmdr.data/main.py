@@ -102,11 +102,13 @@ void main()
     def Back(Me):
         Me.cur=0
 
+I.setBackgroundColor(I.Color4(0.2,0.5,0,0))
 def onCompleteConfig(bi):
     global onRender,onKeyDown
     paint=Paint()
     onRender=paint.onRender
     onKeyDown=bi.getInputProcessor(paint) 
+    I.setBackgroundColor(I.Color4(0.6,0.9,1,0))
 bi=BasicInputConfigurator(onCompleteConfig)
 onKeyDown=bi.onKeyDown
 onRender=bi.onRender

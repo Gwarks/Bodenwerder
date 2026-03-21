@@ -60,6 +60,8 @@ type Interface()=
         new Engine.VertexArray(attrList, arr, primetivetype)
     member Me.getConfigPath()=
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData)
+    member Me.setBackgroundColor(color:Color4)=
+        GL.ClearColor(color)
     member Me.ShaderType = (
         let d = PythonDictionary()
         for v in Enum.GetValues(typeof<ShaderType>) do
@@ -73,8 +75,9 @@ type Interface()=
             d.[e.ToString()] <- e
         d)
     member Me.Vector2i = typeof<Vector2i>
+    member Me.Color4 = typeof<Color4>
 
-let testPython():Engine.EngineCallbacks=
+let loadMain():Engine.EngineCallbacks=
     let engine=Python.CreateEngine()
     let scope=engine.CreateScope()
 
@@ -84,7 +87,6 @@ let testPython():Engine.EngineCallbacks=
 
     engine.ExecuteFile(Path.Combine(Path.GetDirectoryName System.Environment.ProcessPath,"lt.cmdr.data","main.py"),scope)|>ignore
     let onRender(size:Vector2i)=
-        GL.ClearColor(Color4.CornflowerBlue)
         GL.Clear(ClearBufferMask.ColorBufferBit)    
         scope.GetVariable<Func<Vector2i,unit>>("onRender").Invoke(size)
 
@@ -96,7 +98,7 @@ let testPython():Engine.EngineCallbacks=
 
 let run():unit=
     let window=new Engine.Window()    
-    window.Run(testPython())
+    window.Run(loadMain())
     GC.Collect()
     GC.WaitForPendingFinalizers()
     

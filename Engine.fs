@@ -168,6 +168,7 @@ type Window()=
         base.Context.MakeCurrent()
     member Me.Run(callbacks: EngineCallbacks) =
         onKeyDownHandler <- Some callbacks.onKeyDown
+        GL.Viewport(0,0,Me.ClientSize.X,Me.ClientSize.Y)
         while isRunning do
             NativeWindow.ProcessWindowEvents(true)
             GL.Clear(ClearBufferMask.ColorBufferBit|||ClearBufferMask.DepthBufferBit)
