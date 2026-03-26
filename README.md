@@ -24,12 +24,15 @@ Das Modul `Interface` (in Python oft als `I` importiert) stellt Funktionen für 
 *   `createTexture(width: int, height: int, channels: int, texels: bytes) -> Texture`: Erstellt eine Textur aus Byte-Daten.
 *   `createShaderProgram(shaders: list) -> ShaderProgram`: Erstellt ein Shader-Programm. Erwartet eine Liste von Tupeln `(SourceCode, ShaderType)`.
 *   `createVertexArray(attributes: list|dict, vertices: bytes, primitive_type: PrimitiveType) -> VertexArray`: Erstellt ein Vertex-Array (VAO) aus Attribut-Definitionen und Vertex-Daten.
+*   `createMeshFromSDF(min: Vector3, max: Vector3, res: Vector3i, sdf: function) -> HalfEdgeMesh`: Erzeugt ein Mesh aus einer Signed Distance Function (SDF).
 *   `getConfigPath() -> string`: Liefert den Pfad zum AppData-Verzeichnis.
 *   `setBackgroundColor(color: Color4)`: Setzt die Clear-Color des Fensters.
 
 ### Typen und Konstanten
 
 *   `Vector2i`: OpenTK Vektor (Integer).
+*   `Vector3`: OpenTK Vektor (Float).
+*   `Vector3i`: OpenTK Vektor (Integer 3D).
 *   `Color4`: OpenTK Farbe.
 *   `ShaderType`: Mapping von Shadertypen (z.B. `I.ShaderType['VertexShader']`).
 *   `PrimitiveType`: Mapping von Primitiven (z.B. `I.PrimitiveType['TriangleFan']`).
@@ -47,6 +50,10 @@ Das Modul `Interface` (in Python oft als `I` importiert) stellt Funktionen für 
 *   `activate()`: Aktiviert den Shader.
 *   `SetUniform(name: string, value)`: Setzt Uniforms (unterstützt `int`, `float`, `Vector2/3/4`, `Matrix4`).
 *   `getActiveAttributes() -> dict`: Liefert aktive Attribute für `createVertexArray`.
+
+**HalfEdgeMesh**
+*   `Triangulate() -> sequence`: Zerlegt das Mesh in Dreiecke. Liefert eine Liste von (x, y, z, data).
+*   `Map(mapping_func: function) -> HalfEdgeMesh`: Transformiert die Daten des Meshes unter Beibehaltung der Struktur.
 
 **VertexArray**
 *   `draw()`: Führt den Draw-Call aus.

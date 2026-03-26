@@ -60,6 +60,11 @@ type Interface()=
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData)
     member Me.setBackgroundColor(color:Color4)=
         GL.ClearColor(color)
+    member Me.createMeshFromSDF(min: Vector3, max: Vector3, res: Vector3i, sdf: Func<Vector3, obj>) =
+        let sdfWrapper (p: Vector3) =
+            let result = sdf.Invoke(p) :?> System.Collections.Generic.IList<obj>
+            (Convert.ToSingle(result.[0]), result.[1])
+        Mesh.HalfEdgeMesh<obj>.FromSDF(min, max, res, sdfWrapper)
     member Me.ShaderType = (
         let d = PythonDictionary()
         for v in Enum.GetValues(typeof<ShaderType>) do
@@ -73,6 +78,8 @@ type Interface()=
             d.[e.ToString()] <- e
         d)
     member Me.Vector2i = typeof<Vector2i>
+    member Me.Vector3 = typeof<Vector3>
+    member Me.Vector3i = typeof<Vector3i>
     member Me.Color4 = typeof<Color4>
     member Me.Keys = (
         let d = PythonDictionary()

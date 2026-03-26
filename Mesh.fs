@@ -151,3 +151,125 @@ type HalfEdgeMesh<'Data>() =
                                 i <- i + 1
                 | None -> ()
         }
+
+    member Me.Map<'NewData>(mapping: HEHalfEdge<'Data> -> 'NewData) : HalfEdgeMesh<'NewData> =
+        let nm = HalfEdgeMesh<'NewData>()
+        let vMap = System.Collections.Generic.Dictionary<HEVertex<'Data>, HEVertex<'NewData>>()
+        let fMap = System.Collections.Generic.Dictionary<HEFace<'Data>, HEFace<'NewData>>()
+        let eMap = System.Collections.Generic.Dictionary<HEHalfEdge<'Data>, HEHalfEdge<'NewData>>()
+
+        for v in vertices do
+            let nv = HEVertex<'NewData>(v.Position)
+            vMap.[v] <- nv
+            nm.Vertices.Add(nv)
+        for f in faces do
+            let nf = HEFace<'NewData>()
+            fMap.[f] <- nf
+            nm.Faces.Add(nf)
+        for e in edges do
+            let ne = HEHalfEdge<'NewData>()
+            eMap.[e] <- ne
+            nm.Edges.Add(ne)
+
+        for e in edges do
+            let ne = eMap.[e]
+            ne.Data <- mapping e
+            ne.Vertex <- e.Vertex |> Option.map (fun v -> vMap.[v])
+            ne.Pair <- e.Pair |> Option.map (fun p -> eMap.[p])
+            ne.Next <- e.Next |> Option.map (fun n -> eMap.[n])
+            ne.Face <- e.Face |> Option.map (fun f -> fMap.[f])
+
+        for v in vertices do vMap.[v].Edge <- v.Edge |> Option.map (fun e -> eMap.[e])
+        for f in faces do fMap.[f].Edge <- f.Edge |> Option.map (fun e -> eMap.[e])
+        nm
+
+    static member FromSDF(min: Vector3, max: Vector3, res: Vector3i, sdf: Vector3 -> float32 * 'Data) : HalfEdgeMesh<'Data> =
+        let dx = (max.X - min.X) / float32 (res.X - 1)
+        let dy = (max.Y - min.Y) / float32 (res.Y - 1)
+        let dz = (max.Z - min.Z) / float32 (res.Z - 1)
+        let step = Vector3(dx, dy, dz)
+
+        // 1. Raum abtasten
+        let grid = Array3D.init res.X res.Y res.Z (fun i j k ->
+            let p = min + Vector3(float32 i * dx, float32 j * dy, float32 k * dz)
+            sdf p)
+
+        let cellToIdx = System.Collections.Generic.Dictionary<int * int * int, int>()
+        let coords = System.Collections.Generic.List<Vector3>()
+        let cellData = System.Collections.Generic.List<'Data>()
+
+        // 2. Vertices generieren (ein Vertex pro Zelle, die die Oberfläche schneidet)
+        for i in 0 .. res.X - 2 do
+            for j in 0 .. res.Y - 2 do
+                for k in 0 .. res.Z - 2 do
+                    let mutable mask = 0
+                    let mutable vPos = Vector3.Zero
+                    let mutable intersections = 0
+                    let mutable minAbsDist = System.Single.MaxValue
+                    let mutable bestData = Unchecked.defaultof<'Data>
+
+                    // Prüfe die 8 Ecken der Zelle
+                    for ci in 0..1 do
+                        for cj in 0..1 do
+                            for ck in 0..1 do
+                                let d, data = grid.[i+ci, j+cj, k+ck]
+                                if d < 0.0f then mask <- mask ||| (1 <<< (ci*4 + cj*2 + ck))
+                                if abs d < minAbsDist then
+                                    minAbsDist <- abs d
+                                    bestData <- data
+
+                    // Wenn die Zelle die Oberfläche schneidet (nicht alle Ecken gleiches Vorzeichen)
+                    if mask <> 0 && mask <> 255 then
+                        // Berechne Schnittpunkte auf den 12 Kanten der Zelle für bessere Platzierung
+                        let cornerPos i j k = min + Vector3(float32 i * dx, float32 j * dy, float32 k * dz)
+                        
+                        let checkEdge (p1: Vector3) (idx1: Vector3i) (p2: Vector3) (idx2: Vector3i) =
+                            let d1, _ = grid.[idx1.X, idx1.Y, idx1.Z]
+                            let d2, _ = grid.[idx2.X, idx2.Y, idx2.Z]
+                            if (d1 < 0.0f) <> (d2 < 0.0f) then
+                                let t = -d1 / (d2 - d1)
+                                vPos <- vPos + (p1 + t * (p2 - p1))
+                                intersections <- intersections + 1
+
+                        // Kanten in X, Y, Z Richtungen prüfen
+                        for cj in 0..1 do for ck in 0..1 do checkEdge (cornerPos i (j+cj) (k+ck)) (Vector3i(i, j+cj, k+ck)) (cornerPos (i+1) (j+cj) (k+ck)) (Vector3i(i+1, j+cj, k+ck))
+                        for ci in 0..1 do for ck in 0..1 do checkEdge (cornerPos (i+ci) j (k+ck)) (Vector3i(i+ci, j, k+ck)) (cornerPos (i+ci) (j+1) (k+ck)) (Vector3i(i+ci, j+1, k+ck))
+                        for ci in 0..1 do for cj in 0..1 do checkEdge (cornerPos (i+ci) (j+cj) k) (Vector3i(i+ci, j+cj, k)) (cornerPos (i+ci) (j+cj) (k+1)) (Vector3i(i+ci, j+cj, k+1))
+
+                        cellToIdx.[(i,j,k)] <- coords.Count
+                        coords.Add(vPos / float32 intersections)
+                        cellData.Add(bestData)
+
+        // 3. Faces (Quads) generieren
+        let faces = System.Collections.Generic.List<System.Collections.Generic.List<int * 'Data>>()
+        
+        for i in 1 .. res.X - 2 do
+            for j in 1 .. res.Y - 2 do
+                for k in 1 .. res.Z - 2 do
+                    let checkAndCreateFace (idx1: int*int*int) (idx2: int*int*int) (idx3: int*int*int) (idx4: int*int*int) axis flip =
+                        let (x1, y1, z1) = idx1
+                        let (x2, y2, z2) = idx2
+                        let d1, _ = grid.[x1, y1, z1]
+                        let d2, _ = grid.[x2, y2, z2]
+                        if (d1 < 0.0f) <> (d2 < 0.0f) then
+                            let cells = if d1 < 0.0f <> flip then [idx4; idx3; idx2; idx1] else [idx1; idx2; idx3; idx4]
+                            let f = System.Collections.Generic.List<int * 'Data>()
+                            for cx, cy, cz in cells do
+                                let ci = cellToIdx.[(cx, cy, cz)]
+                                f.Add((ci, cellData.[ci]))
+                            faces.Add(f)
+
+                    // Wir prüfen Kanten und verbinden die dualen Vertices der 4 angrenzenden Zellen
+                    // Kante entlang X
+                    if i < res.X-1 && j > 0 && k > 0 then
+                        checkAndCreateFace (i,j-1,k-1) (i,j,k-1) (i,j,k) (i,j-1,k) 0 false
+                    // Kante entlang Y
+                    if j < res.Y-1 && i > 0 && k > 0 then
+                        checkAndCreateFace (i-1,j,k-1) (i,j,k-1) (i,j,k) (i-1,j,k) 1 true
+                    // Kante entlang Z
+                    if k < res.Z-1 && i > 0 && j > 0 then
+                        checkAndCreateFace (i-1,j-1,k) (i,j-1,k) (i,j,k) (i-1,j,k) 2 false
+
+        let mesh = HalfEdgeMesh<'Data>()
+        mesh.Build(coords, faces)
+        mesh
