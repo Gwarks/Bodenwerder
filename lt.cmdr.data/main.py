@@ -80,4 +80,5 @@ def onCompleteConfig(bi):
     I.setBackgroundColor(I.Color4(0.6,0.9,1,0))
 bi=input.BasicInputConfigurator(onCompleteConfig)
 onKeyDown=bi.onKeyDown
+onKeyUp=lambda x:None
 onRender=bi.onRender

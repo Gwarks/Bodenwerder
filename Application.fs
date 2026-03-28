@@ -99,11 +99,12 @@ let loadMain():Engine.EngineCallbacks=
         GL.Clear(ClearBufferMask.ColorBufferBit &&& ClearBufferMask.DepthBufferBit)            
         scope.GetVariable<Func<Vector2i,unit>>("onRender").Invoke(size)
 
-    let pyOnKeyDown = scope.GetVariable<Func<Keys,unit>>("onKeyDown")
     let onKeyDown(k:Keys)=
         scope.GetVariable<Func<Keys,unit>>("onKeyDown").Invoke(k)
+    let onKeyUp(k:Keys)=
+        scope.GetVariable<Func<Keys,unit>>("onKeyUp").Invoke(k)
 
-    { onRender = onRender; onKeyDown = onKeyDown }
+    { onRender = onRender; onKeyDown = onKeyDown; onKeyUp = onKeyUp }
 
 let run():unit=
     let window=new Engine.Window()    

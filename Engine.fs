@@ -153,6 +153,7 @@ type VertexArray(attributes:(ActiveAttribType * int * int) list, vertexs:System.
 type EngineCallbacks = {
     onRender: Vector2i -> unit
     onKeyDown: Keys -> unit
+    onKeyUp: Keys -> unit
 }
 
 type Window()=
@@ -161,11 +162,11 @@ type Window()=
                                             WindowState = WindowState.Maximized,  // Das macht es maximized!
                                             WindowBorder = WindowBorder.Resizable))
     let mutable isRunning=true
-    let mutable onKeyDownHandler: (Keys -> unit) option = None
+    let mutable handler: EngineCallbacks option = None
     do
         base.Context.MakeCurrent()
     member Me.Run(callbacks: EngineCallbacks) =
-        onKeyDownHandler <- Some callbacks.onKeyDown
+        handler <- Some callbacks
         GL.Viewport(0,0,Me.ClientSize.X,Me.ClientSize.Y)
         while isRunning do
             NativeWindow.ProcessWindowEvents(true)
@@ -178,8 +179,13 @@ type Window()=
         base.OnResize(e)
     override this.OnKeyDown(e: KeyboardKeyEventArgs) =
         base.OnKeyDown(e)
-        match onKeyDownHandler with
-        | Some handler -> handler e.Key
+        match handler with
+        | Some handler -> handler.onKeyDown(e.Key)
+        | None -> ()
+    override this.OnKeyUp(e: KeyboardKeyEventArgs) =
+        base.OnKeyUp(e)
+        match handler with
+        | Some handler -> handler.onKeyUp(e.Key)
         | None -> ()
     override Me.OnClosing(e:CancelEventArgs)=
         isRunning<-false
