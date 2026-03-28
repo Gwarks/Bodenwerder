@@ -243,32 +243,49 @@ type HalfEdgeMesh<'Data>() =
         // 3. Faces (Quads) generieren
         let faces = System.Collections.Generic.List<System.Collections.Generic.List<int * 'Data>>()
         
-        for i in 1 .. res.X - 2 do
-            for j in 1 .. res.Y - 2 do
-                for k in 1 .. res.Z - 2 do
-                    let checkAndCreateFace (idx1: int*int*int) (idx2: int*int*int) (idx3: int*int*int) (idx4: int*int*int) axis flip =
-                        let (x1, y1, z1) = idx1
-                        let (x2, y2, z2) = idx2
-                        let d1, _ = grid.[x1, y1, z1]
-                        let d2, _ = grid.[x2, y2, z2]
-                        if (d1 < 0.0f) <> (d2 < 0.0f) then
-                            let cells = if d1 < 0.0f <> flip then [idx4; idx3; idx2; idx1] else [idx1; idx2; idx3; idx4]
-                            let f = System.Collections.Generic.List<int * 'Data>()
-                            for cx, cy, cz in cells do
-                                let ci = cellToIdx.[(cx, cy, cz)]
-                                f.Add((ci, cellData.[ci]))
-                            faces.Add(f)
+        let getV idx =
+            match cellToIdx.TryGetValue(idx) with
+            | true, ci -> Some (ci, cellData.[ci])
+            | _ -> None
 
-                    // Wir prüfen Kanten und verbinden die dualen Vertices der 4 angrenzenden Zellen
-                    // Kante entlang X
-                    if i < res.X-1 && j > 0 && k > 0 then
-                        checkAndCreateFace (i,j-1,k-1) (i,j,k-1) (i,j,k) (i,j-1,k) 0 false
-                    // Kante entlang Y
-                    if j < res.Y-1 && i > 0 && k > 0 then
-                        checkAndCreateFace (i-1,j,k-1) (i,j,k-1) (i,j,k) (i-1,j,k) 1 true
-                    // Kante entlang Z
-                    if k < res.Z-1 && i > 0 && j > 0 then
-                        checkAndCreateFace (i-1,j-1,k) (i,j-1,k) (i,j,k) (i-1,j,k) 2 false
+        for i in 0 .. res.X - 1 do
+            for j in 0 .. res.Y - 1 do
+                for k in 0 .. res.Z - 1 do
+                    // X-axis edge crossing check
+                    if i < res.X - 1 && j > 0 && k > 0 then
+                        let d1, _ = grid.[i, j, k]
+                        let d2, _ = grid.[i+1, j, k]
+                        if (d1 < 0.0f) <> (d2 < 0.0f) then
+                            let v = [ getV (i,j,k); getV (i,j-1,k); getV (i,j-1,k-1); getV (i,j,k-1) ]
+                            if v |> List.forall Option.isSome then
+                                let face = System.Collections.Generic.List()
+                                let list = if d1 < 0.0f then List.rev v else v
+                                for x in list do face.Add(x.Value)
+                                faces.Add(face)
+
+                    // Y-axis edge crossing check
+                    if j < res.Y - 1 && i > 0 && k > 0 then
+                        let d1, _ = grid.[i, j, k]
+                        let d2, _ = grid.[i, j+1, k]
+                        if (d1 < 0.0f) <> (d2 < 0.0f) then
+                            let v = [ getV (i,j,k); getV (i-1,j,k); getV (i-1,j,k-1); getV (i,j,k-1) ]
+                            if v |> List.forall Option.isSome then
+                                let face = System.Collections.Generic.List()
+                                let list = if d1 > 0.0f then List.rev v else v
+                                for x in list do face.Add(x.Value)
+                                faces.Add(face)
+
+                    // Z-axis edge crossing check
+                    if k < res.Z - 1 && i > 0 && j > 0 then
+                        let d1, _ = grid.[i, j, k]
+                        let d2, _ = grid.[i, j, k+1]
+                        if (d1 < 0.0f) <> (d2 < 0.0f) then
+                            let v = [ getV (i,j,k); getV (i,j-1,k); getV (i-1,j-1,k); getV (i-1,j,k) ]
+                            if v |> List.forall Option.isSome then
+                                let face = System.Collections.Generic.List()
+                                let list = if d1 < 0.0f then List.rev v else v
+                                for x in list do face.Add(x.Value)
+                                faces.Add(face)
 
         let mesh = HalfEdgeMesh<'Data>()
         mesh.Build(coords, faces)

@@ -60,6 +60,8 @@ type Interface()=
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData)
     member Me.setBackgroundColor(color:Color4)=
         GL.ClearColor(color)
+    member Me.setDepthTest(enable:bool)=
+        if enable then GL.Enable(EnableCap.DepthTest) else GL.Disable(EnableCap.DepthTest)
     member Me.createMeshFromSDF(min: Vector3, max: Vector3, res: Vector3i, sdf: Func<Vector3, obj>) =
         let sdfWrapper (p: Vector3) =
             let result = sdf.Invoke(p) :?> System.Collections.Generic.IList<obj>
@@ -77,10 +79,11 @@ type Interface()=
             let e: PrimitiveType = v :?> PrimitiveType
             d.[e.ToString()] <- e
         d)
-    member Me.Vector2i = typeof<Vector2i>
-    member Me.Vector3 = typeof<Vector3>
-    member Me.Vector3i = typeof<Vector3i>
-    member Me.Color4 = typeof<Color4>
+    member Me.Vector2i = Tools.TypeWrapper(typeof<Vector2i>)
+    member Me.Vector3 = Tools.TypeWrapper(typeof<Vector3>)
+    member Me.Vector3i = Tools.TypeWrapper(typeof<Vector3i>)
+    member Me.Color4 = Tools.TypeWrapper(typeof<Color4>)
+    member Me.Matrix4 = Tools.TypeWrapper(typeof<Matrix4>)
     member Me.Keys = (
         let d = PythonDictionary()
         for v in Enum.GetValues(typeof<Keys>) do
@@ -103,7 +106,7 @@ let loadMain():Engine.EngineCallbacks=
 
     engine.ExecuteFile(Path.Combine(dataPath, "main.py"), scope) |> ignore
     let onRender(size:Vector2i)=
-        GL.Clear(ClearBufferMask.ColorBufferBit)    
+        GL.Clear(ClearBufferMask.ColorBufferBit &&& ClearBufferMask.DepthBufferBit)            
         scope.GetVariable<Func<Vector2i,unit>>("onRender").Invoke(size)
 
     let pyOnKeyDown = scope.GetVariable<Func<Keys,unit>>("onKeyDown")
