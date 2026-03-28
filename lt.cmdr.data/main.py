@@ -1,5 +1,5 @@
 import Interface as I
-import itertools,struct,math
+import itertools,struct,math,time
 import input
 
 I.setDepthTest(True)
@@ -16,7 +16,6 @@ sdf=list(I.createMeshFromSDF(I.Vector3(-1.0,-1.0,-1.0),I.Vector3(1.0,1.0,1.0),I.
 
 class Paint:
     def __init__(Me):
-        Me.angle = 0.0
         Me.tq=I.getTextureQuad()        
         Me.t=I.createTexture(256,256,4,bytes(itertools.chain.from_iterable((x,y,0,255) for y in range(256) for x in range(256))))
         Me.pos=I.Vector2i(0,0)
@@ -32,7 +31,7 @@ void main()
     gl_Position = uMVP * vec4(aPosition,1.0);
     Color = aColor;
 }
-""",I.ShaderType['VertexShader'])
+""",I.ShaderType.VertexShader)
      ,   ("""
 #version 330 core
 in vec3 Color;
@@ -41,17 +40,17 @@ void main()
 {
     FragColor = vec4(Color,1.0);
 }
-""",I.ShaderType['FragmentShader'])
+""",I.ShaderType.FragmentShader)
 ])
         b=b''.join(struct.pack('=fff fff',x,y,z,*o) for x,y,z,o in sdf)
         aa=Me.sp.getActiveAttributes()
-        Me.va=I.createVertexArray([aa[x] for x in ('aPosition','aColor')],b,I.PrimitiveType['Triangles'])
+        Me.va=I.createVertexArray([aa[x] for x in ('aPosition','aColor')],b,I.PrimitiveType.Triangles)
     def onRender(Me,size):
-        Me.angle += 0.0005
+        angle = time.perf_counter()
         aspect = float(size.X) / float(size.Y)
         
         proj = I.Matrix4.CreatePerspectiveFieldOfView(math.pi / 4.0, aspect, 0.1, 100.0)
-        eye = I.Vector3(math.sin(Me.angle) * 5.0, 1.5, math.cos(Me.angle) * 5.0)
+        eye = I.Vector3(math.sin(angle) * 5.0, 1.5, math.cos(angle) * 5.0)
         view = I.Matrix4.LookAt(eye, I.Vector3(0, 0, 0), I.Vector3(0, 1, 0))
         mvp = view * proj
         

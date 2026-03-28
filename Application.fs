@@ -67,18 +67,8 @@ type Interface()=
             let result = sdf.Invoke(p) :?> System.Collections.Generic.IList<obj>
             (Convert.ToSingle(result.[0]), result.[1])
         Mesh.HalfEdgeMesh<obj>.FromSDF(min, max, res, sdfWrapper)
-    member Me.ShaderType = (
-        let d = PythonDictionary()
-        for v in Enum.GetValues(typeof<ShaderType>) do
-            let e = v :?> ShaderType
-            d.[e.ToString()] <- e
-        d)
-    member Me.PrimitiveType = (
-        let d = PythonDictionary()
-        for v in Enum.GetValues(typeof<PrimitiveType>) do
-            let e: PrimitiveType = v :?> PrimitiveType
-            d.[e.ToString()] <- e
-        d)
+    member Me.PrimitiveType = Tools.TypeWrapper(typeof<PrimitiveType>)
+    member Me.ShaderType = Tools.TypeWrapper(typeof<ShaderType>)
     member Me.Vector2i = Tools.TypeWrapper(typeof<Vector2i>)
     member Me.Vector3 = Tools.TypeWrapper(typeof<Vector3>)
     member Me.Vector3i = Tools.TypeWrapper(typeof<Vector3i>)
