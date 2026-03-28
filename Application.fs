@@ -96,7 +96,7 @@ let loadMain():Engine.EngineCallbacks=
 
     engine.ExecuteFile(Path.Combine(dataPath, "main.py"), scope) |> ignore
     let onRender(size:Vector2i)=
-        GL.Clear(ClearBufferMask.ColorBufferBit &&& ClearBufferMask.DepthBufferBit)            
+        GL.Clear(ClearBufferMask.ColorBufferBit ||| ClearBufferMask.DepthBufferBit)            
         scope.GetVariable<Func<Vector2i,unit>>("onRender").Invoke(size)
 
     let onKeyDown(k:Keys)=

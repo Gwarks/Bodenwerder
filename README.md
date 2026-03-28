@@ -27,6 +27,7 @@ Das Modul `Interface` (in Python oft als `I` importiert) stellt Funktionen für 
 *   `createMeshFromSDF(min: Vector3, max: Vector3, res: Vector3i, sdf: function) -> HalfEdgeMesh`: Erzeugt ein Mesh aus einer Signed Distance Function (SDF).
 *   `getConfigPath() -> string`: Liefert den Pfad zum AppData-Verzeichnis.
 *   `setBackgroundColor(color: Color4)`: Setzt die Clear-Color des Fensters.
+*   `setDepthTest(enable: bool)`: Aktiviert oder deaktiviert den OpenGL Depth-Test (Z-Buffer).
 
 ### Typen und Konstanten
 
@@ -57,3 +58,11 @@ Das Modul `Interface` (in Python oft als `I` importiert) stellt Funktionen für 
 
 **VertexArray**
 *   `draw()`: Führt den Draw-Call aus.
+
+## Skript-Schnittstelle (Callbacks)
+
+Die Engine erwartet, dass die `main.py` nach ihrer Ausführung folgende Funktionen im globalen Namensraum bereitstellt, um auf Ereignisse zu reagieren:
+
+*   `onRender(size: Vector2i)`: Wird in jedem Frame aufgerufen. Hier erfolgt das Zeichnen der Objekte.
+*   `onKeyDown(key: Keys)`: Wird aufgerufen, wenn eine Taste gedrückt wird.
+*   `onKeyUp(key: Keys)`: Wird aufgerufen, wenn eine Taste losgelassen wird.
