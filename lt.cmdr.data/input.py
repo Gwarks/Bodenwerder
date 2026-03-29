@@ -5,11 +5,16 @@ import os
 class BasicInput:
     def __init__(Me,keys):
         Me.keys=keys
-    def getInputProcessor(Me,ip):
-        def f(key):
-            if key in Me.keys:
-                getattr(ip,Me.keys[key],lambda:None)()
-        return f
+    def getInputProcessor(MeOuter,ip):
+        class c:
+            def onKeyDown(Me,key):
+                if key in MeOuter.keys:
+                    getattr(ip,MeOuter.keys[key],lambda:None)()
+            def onKeyUp(Me, key): pass
+            def onJoystickButtonDown(Me, id, name, button): pass
+            def onJoystickButtonUp(Me, id, name, button): pass
+            def onJoystickAxis(Me, id, name, axis, value): pass
+        return c()
 
 class ConfigStateConfirm:
     def __init__(Me,ctx,loaded_config):
@@ -100,6 +105,10 @@ class BasicInputConfigurator:
         Me.state=state
     def onKeyDown(Me,key):
         Me.state.onKeyDown(key)
+    def onKeyUp(Me, key): pass
+    def onJoystickButtonDown(Me, id, name, button): pass
+    def onJoystickButtonUp(Me, id, name, button): pass
+    def onJoystickAxis(Me, id, name, axis, value): pass
     def onRender(Me,size):
         Me.tq.render(Me.t_title,I.Vector2i((size.X-Me.t_title.Size.X)>>1,0),size)
         py=Me.t_title.Size.Y+4

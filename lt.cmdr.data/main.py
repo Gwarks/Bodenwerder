@@ -73,12 +73,12 @@ void main()
 
 I.setBackgroundColor(I.Color4(0.2,0.5,0,0))
 def onCompleteConfig(bi):
-    global onRender,onKeyDown
+    global onRender,InputHandler
     paint=Paint()
     onRender=paint.onRender
-    onKeyDown=bi.getInputProcessor(paint) 
+    InputHandler=bi.getInputProcessor(paint) 
     I.setBackgroundColor(I.Color4(0.6,0.9,1,0))
 bi=input.BasicInputConfigurator(onCompleteConfig)
-onKeyDown=bi.onKeyDown
-onRender=bi.onRender
-onJoystickButtonDown=lambda *p:print(p)
+
+InputHandler = bi
+onRender = bi.onRender

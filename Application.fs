@@ -94,34 +94,35 @@ let loadMain():Engine.EngineCallbacks=
     let modules = sys.GetVariable<System.Collections.Generic.IDictionary<string, obj>>("modules")
     modules.["Interface"] <- Interface()
 
+    let callPython (objName: string option) (funcName: string) (args: obj[]) =
+        let target = 
+            match objName with
+            | Some name -> 
+                match scope.TryGetVariable<obj>(name) with
+                | true, o -> Some o
+                | _ -> None
+            | None -> Some (scope :> obj)
+
+        try
+            match target with
+            | Some t ->
+                let memberObj = if objName.IsSome then engine.Operations.GetMember(t, funcName) else scope.GetVariable<obj>(funcName)
+                if engine.Operations.IsCallable(memberObj) then
+                    engine.Operations.Invoke(memberObj, args) |> ignore
+            | None -> ()
+        with _ -> ()
+
     engine.ExecuteFile(Path.Combine(dataPath, "main.py"), scope) |> ignore
+
     let onRender(size:Vector2i)=
         GL.Clear(ClearBufferMask.ColorBufferBit ||| ClearBufferMask.DepthBufferBit)            
-        scope.GetVariable<Func<Vector2i,unit>>("onRender").Invoke(size)
+        callPython None "onRender" [| size |]
 
-    let onKeyDown(k:Keys)=
-        match scope.TryGetVariable<Func<Keys,unit>>("onKeyDown") with
-        | true, f -> f.Invoke(k)
-        | _ -> ()
-    let onKeyUp(k:Keys)=
-        match scope.TryGetVariable<Func<Keys,unit>>("onKeyUp") with
-        | true, f -> f.Invoke(k)
-        | _ -> ()
-
-    let onJoystickButtonDown id name button =
-        match scope.TryGetVariable<Func<int,string,int,unit>>("onJoystickButtonDown") with
-        | true, f -> f.Invoke(id, name, button)
-        | _ -> ()
-
-    let onJoystickButtonUp id name button =
-        match scope.TryGetVariable<Func<int,string,int,unit>>("onJoystickButtonUp") with
-        | true, f -> f.Invoke(id, name, button)
-        | _ -> ()
-
-    let onJoystickAxis id name axis value =
-        match scope.TryGetVariable<Func<int,string,int,float32,unit>>("onJoystickAxis") with
-        | true, f -> f.Invoke(id, name, axis, value)
-        | _ -> ()
+    let onKeyDown k = callPython (Some "InputHandler") "onKeyDown" [| k |]
+    let onKeyUp k = callPython (Some "InputHandler") "onKeyUp" [| k |]
+    let onJoystickButtonDown id name btn = callPython (Some "InputHandler") "onJoystickButtonDown" [| id; name; btn |]
+    let onJoystickButtonUp id name btn = callPython (Some "InputHandler") "onJoystickButtonUp" [| id; name; btn |]
+    let onJoystickAxis id name axis value = callPython (Some "InputHandler") "onJoystickAxis" [| id; name; axis; value |]
 
     { onRender = onRender; onKeyDown = onKeyDown; onKeyUp = onKeyUp;
       onJoystickButtonDown = onJoystickButtonDown; onJoystickButtonUp = onJoystickButtonUp;
