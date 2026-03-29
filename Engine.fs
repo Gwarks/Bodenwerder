@@ -154,6 +154,9 @@ type EngineCallbacks = {
     onRender: Vector2i -> unit
     onKeyDown: Keys -> unit
     onKeyUp: Keys -> unit
+    onJoystickButtonDown: int -> string -> int -> unit
+    onJoystickButtonUp: int -> string -> int -> unit
+    onJoystickAxis: int -> string -> int -> float32 -> unit
 }
 
 type Window()=
@@ -163,30 +166,72 @@ type Window()=
                                             WindowBorder = WindowBorder.Resizable))
     let mutable isRunning=true
     let mutable handler: EngineCallbacks option = None
-    do
-        base.Context.MakeCurrent()
+    let lastButtonStates = System.Collections.Generic.Dictionary<int, bool[]>()
+    let joystickNames = System.Collections.Generic.Dictionary<int, string>()
+
     member Me.Run(callbacks: EngineCallbacks) =
         handler <- Some callbacks
         GL.Viewport(0,0,Me.ClientSize.X,Me.ClientSize.Y)
         while isRunning do
-            NativeWindow.ProcessWindowEvents(true)
+            NativeWindow.ProcessWindowEvents(false)
+            if Me.IsFocused then
+                for i in 0 .. 15 do
+                    if GLFW.JoystickPresent(i) then
+                        let buttons: System.ReadOnlySpan<JoystickInputAction> = GLFW.GetJoystickButtons(i)
+                        let axes: System.ReadOnlySpan<float32> = GLFW.GetJoystickAxes(i)
+                        let name = 
+                            match joystickNames.TryGetValue(i) with
+                            | true, n -> n
+                            | false, _ -> 
+                                let n = GLFW.GetJoystickName(i)
+                                joystickNames.[i] <- n
+                                n
+                        
+                        let mutable prevButtons = 
+                            match lastButtonStates.TryGetValue(i) with
+                            | true, b -> b
+                            | false, _ -> 
+                                let b = Array.create buttons.Length false
+                                lastButtonStates.[i] <- b
+                                b
+                        
+                        if prevButtons.Length <> buttons.Length then
+                            prevButtons <- Array.create buttons.Length false
+                            lastButtonStates.[i] <- prevButtons
+
+                        for b in 0 .. buttons.Length - 1 do
+                            let isDown = buttons.[b] = JoystickInputAction.Press
+                            if isDown && not prevButtons.[b] then
+                                callbacks.onJoystickButtonDown i name b
+                            elif not isDown && prevButtons.[b] then
+                                callbacks.onJoystickButtonUp i name b
+                            prevButtons.[b] <- isDown
+
+                        for a in 0 .. axes.Length - 1 do
+                            callbacks.onJoystickAxis i name a axes.[a]
+                    else
+                        lastButtonStates.Remove i |> ignore
+                        joystickNames.Remove i |> ignore
+
             GL.Clear(ClearBufferMask.ColorBufferBit|||ClearBufferMask.DepthBufferBit)
             callbacks.onRender(Me.ClientSize)
             Thread.Sleep(1)
             Me.Context.SwapBuffers()
+
     override Me.OnResize(e: ResizeEventArgs)=
         GL.Viewport(0,0,e.Width,e.Height)
         base.OnResize(e)
-    override this.OnKeyDown(e: KeyboardKeyEventArgs) =
+    override Me.OnKeyDown(e: KeyboardKeyEventArgs) =
         base.OnKeyDown(e)
         match handler with
         | Some handler -> handler.onKeyDown(e.Key)
         | None -> ()
-    override this.OnKeyUp(e: KeyboardKeyEventArgs) =
+    override Me.OnKeyUp(e: KeyboardKeyEventArgs) =
         base.OnKeyUp(e)
         match handler with
         | Some handler -> handler.onKeyUp(e.Key)
         | None -> ()
+
     override Me.OnClosing(e:CancelEventArgs)=
         isRunning<-false
         base.OnClosing(e)

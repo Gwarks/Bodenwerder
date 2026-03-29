@@ -100,11 +100,42 @@ let loadMain():Engine.EngineCallbacks=
         scope.GetVariable<Func<Vector2i,unit>>("onRender").Invoke(size)
 
     let onKeyDown(k:Keys)=
-        scope.GetVariable<Func<Keys,unit>>("onKeyDown").Invoke(k)
+        match scope.TryGetVariable<Func<Keys,unit>>("onKeyDown") with
+        | true, f -> f.Invoke(k)
+        | _ -> ()
     let onKeyUp(k:Keys)=
-        scope.GetVariable<Func<Keys,unit>>("onKeyUp").Invoke(k)
+        match scope.TryGetVariable<Func<Keys,unit>>("onKeyUp") with
+        | true, f -> f.Invoke(k)
+        | _ -> ()
 
-    { onRender = onRender; onKeyDown = onKeyDown; onKeyUp = onKeyUp }
+    let onJoystickButtonDown id name button =
+        match scope.TryGetVariable<Func<int,string,int,unit>>("onJoystickButtonDown") with
+        | true, f -> f.Invoke(id, name, button)
+        | _ -> ()
+
+    let onJoystickButtonUp id name button =
+        match scope.TryGetVariable<Func<int,string,int,unit>>("onJoystickButtonUp") with
+        | true, f -> f.Invoke(id, name, button)
+        | _ -> ()
+
+    let onJoystickAxis id name axis value =
+        match scope.TryGetVariable<Func<int,string,int,float32,unit>>("onJoystickAxis") with
+        | true, f -> f.Invoke(id, name, axis, value)
+        | _ -> ()
+
+    let onJoystickConnected id name =
+        match scope.TryGetVariable<Func<int,string,unit>>("onJoystickConnected") with
+        | true, f -> f.Invoke(id, name)
+        | _ -> ()
+
+    let onJoystickDisconnected id name =
+        match scope.TryGetVariable<Func<int,string,unit>>("onJoystickDisconnected") with
+        | true, f -> f.Invoke(id, name)
+        | _ -> ()
+
+    { onRender = onRender; onKeyDown = onKeyDown; onKeyUp = onKeyUp;
+      onJoystickButtonDown = onJoystickButtonDown; onJoystickButtonUp = onJoystickButtonUp;
+      onJoystickAxis = onJoystickAxis}
 
 let run():unit=
     let window=new Engine.Window()    

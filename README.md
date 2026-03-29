@@ -66,3 +66,6 @@ Die Engine erwartet, dass die `main.py` nach ihrer Ausführung folgende Funktion
 *   `onRender(size: Vector2i)`: Wird in jedem Frame aufgerufen. Hier erfolgt das Zeichnen der Objekte.
 *   `onKeyDown(key: Keys)`: Wird aufgerufen, wenn eine Taste gedrückt wird.
 *   `onKeyUp(key: Keys)`: Wird aufgerufen, wenn eine Taste losgelassen wird.
+*   `onJoystickButtonDown(id: int, name: string, button: int)`: Wird aufgerufen, wenn ein Joystick-Button gedrückt wird.
+*   `onJoystickButtonUp(id: int, name: string, button: int)`: Wird aufgerufen, wenn ein Joystick-Button losgelassen wird.
+*   `onJoystickAxis(id: int, name: string, axis: int, value: float)`: Wird in jedem Frame für jede Achse aufgerufen.
