@@ -123,16 +123,6 @@ let loadMain():Engine.EngineCallbacks=
         | true, f -> f.Invoke(id, name, axis, value)
         | _ -> ()
 
-    let onJoystickConnected id name =
-        match scope.TryGetVariable<Func<int,string,unit>>("onJoystickConnected") with
-        | true, f -> f.Invoke(id, name)
-        | _ -> ()
-
-    let onJoystickDisconnected id name =
-        match scope.TryGetVariable<Func<int,string,unit>>("onJoystickDisconnected") with
-        | true, f -> f.Invoke(id, name)
-        | _ -> ()
-
     { onRender = onRender; onKeyDown = onKeyDown; onKeyUp = onKeyUp;
       onJoystickButtonDown = onJoystickButtonDown; onJoystickButtonUp = onJoystickButtonUp;
       onJoystickAxis = onJoystickAxis}
