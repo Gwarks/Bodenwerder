@@ -12,6 +12,8 @@ open IronPython.Runtime
     
 
 type Interface()=
+    member Me.createSurfaceRGBA(width:int, height:int)=
+        Engine.Canvas.createSurfaceRGBA(width,height)
     member Me.getTextRenderer(size:float32):Engine.Canvas.TextRenderer=
         Engine.Canvas.TextRenderer(size)
     member Me.getTextureQuad()=
@@ -81,7 +83,7 @@ type Interface()=
             d.[e.ToString()] <- e
         d)
 
-let loadMain():Engine.EngineCallbacks=
+let loadMain(exitAction: unit -> unit):Engine.EngineCallbacks=
     let engine=Python.CreateEngine()
     let dataPath = Path.Combine(Path.GetDirectoryName System.Environment.ProcessPath, "lt.cmdr.data")
     let searchPaths = engine.GetSearchPaths()
@@ -110,7 +112,9 @@ let loadMain():Engine.EngineCallbacks=
                 if engine.Operations.IsCallable(memberObj) then
                     engine.Operations.Invoke(memberObj, args) |> ignore
             | None -> ()
-        with _ -> ()
+        with ex ->
+            printfn "Critical Python Exception in %s: %O" funcName ex
+            exitAction()
 
     engine.ExecuteFile(Path.Combine(dataPath, "main.py"), scope) |> ignore
 
@@ -130,7 +134,7 @@ let loadMain():Engine.EngineCallbacks=
 
 let run():unit=
     let window=new Engine.Window()    
-    window.Run(loadMain())
+    window.Run(loadMain(fun () -> window.Close()))
     GC.Collect()
     GC.WaitForPendingFinalizers()
     

@@ -64,6 +64,10 @@ type TextRenderer(size:float32) =
         canvas.DrawText(blob, 0f, 0f, paint)
         image2texture(surface.Snapshot())
 
+let createSurfaceRGBA(width:int, height:int):SKSurface=
+    let info = SKImageInfo(width,  height, SKColorType.Rgba8888)
+    SKSurface.Create(info)
+
 type TextureQuad()=
     let shaderProgram = ShaderProgram ([
         ("""
