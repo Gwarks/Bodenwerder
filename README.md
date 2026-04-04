@@ -7,6 +7,7 @@ Bodenwerder ist eine Grafik-Engine, die auf F# und OpenTK basiert. Sie integrier
 * **Core (F#)**: Abstraktion von OpenGL 4.x (Shader, VBOs, VAOs, Texturen) und Fenstermanagement.
 * **Scripting (Python)**: Die Hauptlogik befindet sich in Python-Skripten (z.B. `lt.cmdr.data/main.py`), die über eine Bridge auf die Engine zugreifen.
 * **UI/Text**: Text-Rendering mittels SkiaSharp mit Unterstützung für Noto Fonts und Emojis.
+*   **Input**: Unterstützung für Tastatur und mehrere Joysticks/Gamepads mit Flankenerkennung für Buttons.
 * **Geometrie**: Enthält eine Half-Edge Datenstruktur (`Mesh.fs`) zur Verarbeitung und Triangulierung (Ear Clipping) von Polygon-Meshes.
 
 ## Coding Style
@@ -28,6 +29,7 @@ Das Modul `Interface` (in Python oft als `I` importiert) stellt Funktionen für 
 *   `getConfigPath() -> string`: Liefert den Pfad zum AppData-Verzeichnis.
 *   `setBackgroundColor(color: Color4)`: Setzt die Clear-Color des Fensters.
 *   `setDepthTest(enable: bool)`: Aktiviert oder deaktiviert den OpenGL Depth-Test (Z-Buffer).
+*   `getJoysticks() -> list`: Liefert eine Liste aller aktiven Joysticks als Tuples `(id, name, axes, buttons)`.
 
 ### Typen und Konstanten
 
@@ -61,11 +63,26 @@ Das Modul `Interface` (in Python oft als `I` importiert) stellt Funktionen für 
 
 ## Skript-Schnittstelle (Callbacks)
 
-Die Engine erwartet, dass die `main.py` nach ihrer Ausführung folgende Funktionen im globalen Namensraum bereitstellt, um auf Ereignisse zu reagieren:
+Die Engine erwartet eine bestimmte Struktur in der `main.py`, um Events an das Skript weiterzureichen.
 
-*   `onRender(size: Vector2i)`: Wird in jedem Frame aufgerufen. Hier erfolgt das Zeichnen der Objekte.
-*   `onKeyDown(key: Keys)`: Wird aufgerufen, wenn eine Taste gedrückt wird.
-*   `onKeyUp(key: Keys)`: Wird aufgerufen, wenn eine Taste losgelassen wird.
-*   `onJoystickButtonDown(id: int, name: string, button: int)`: Wird aufgerufen, wenn ein Joystick-Button gedrückt wird.
-*   `onJoystickButtonUp(id: int, name: string, button: int)`: Wird aufgerufen, wenn ein Joystick-Button losgelassen wird.
-*   `onJoystickAxis(id: int, name: string, axis: int, value: float)`: Wird in jedem Frame für jede Achse aufgerufen.
+### Globale Funktionen
+*   `onRender(size: Vector2i)`: Haupt-Render-Callback. Wird in jedem Frame aufgerufen.
+
+### Das InputHandler-Objekt
+Alle Eingabe-Events werden an ein globales Objekt namens `InputHandler` gesendet. Dieses muss folgende Methoden (optional) implementieren:
+
+```python
+class MyHandler:
+    def onKeyDown(self, key):
+        pass
+    def onKeyUp(self, key):
+        pass
+    def onJoystickButtonDown(self, id, name, button):
+        pass
+    def onJoystickButtonUp(self, id, name, button):
+        pass
+    def onJoystickAxis(self, id, name, axis, value):
+        pass
+
+InputHandler = MyHandler()
+```
