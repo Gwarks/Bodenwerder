@@ -11,7 +11,7 @@ open IronPython.Runtime
 //type TextureQuad(texture,)=
     
 
-type Interface()=
+type Interface(window: Engine.Window)=
     member Me.createSurfaceRGBA(width:int, height:int)=
         Engine.Canvas.createSurfaceRGBA(width,height)
     member Me.getTextRenderer(size:float32):Engine.Canvas.TextRenderer=
@@ -69,6 +69,8 @@ type Interface()=
             let result = sdf.Invoke(p) :?> System.Collections.Generic.IList<obj>
             (Convert.ToSingle(result.[0]), result.[1])
         Mesh.HalfEdgeMesh<obj>.FromSDF(min, max, res, sdfWrapper)
+    member Me.getJoysticks() =
+        window.GetJoystickInfos()
     member Me.PrimitiveType = Tools.TypeWrapper(typeof<PrimitiveType>)
     member Me.ShaderType = Tools.TypeWrapper(typeof<ShaderType>)
     member Me.Vector2i = Tools.TypeWrapper(typeof<Vector2i>)
@@ -83,7 +85,8 @@ type Interface()=
             d.[e.ToString()] <- e
         d)
 
-let loadMain(exitAction: unit -> unit):Engine.EngineCallbacks=
+let runMain()=
+    let window=new Engine.Window()
     let engine=Python.CreateEngine()
     let dataPath = Path.Combine(Path.GetDirectoryName System.Environment.ProcessPath, "lt.cmdr.data")
     let searchPaths = engine.GetSearchPaths()
@@ -94,7 +97,7 @@ let loadMain(exitAction: unit -> unit):Engine.EngineCallbacks=
 
     let sys = Python.GetSysModule(engine)
     let modules = sys.GetVariable<System.Collections.Generic.IDictionary<string, obj>>("modules")
-    modules.["Interface"] <- Interface()
+    modules.["Interface"] <- Interface(window)
 
     let callPython (objName: string option) (funcName: string) (args: obj[]) =
         let target = 
@@ -114,7 +117,7 @@ let loadMain(exitAction: unit -> unit):Engine.EngineCallbacks=
             | None -> ()
         with ex ->
             printfn "Critical Python Exception in %s: %O" funcName ex
-            exitAction()
+            window.Close()
 
     engine.ExecuteFile(Path.Combine(dataPath, "main.py"), scope) |> ignore
 
@@ -128,13 +131,12 @@ let loadMain(exitAction: unit -> unit):Engine.EngineCallbacks=
     let onJoystickButtonUp id name btn = callPython (Some "InputHandler") "onJoystickButtonUp" [| id; name; btn |]
     let onJoystickAxis id name axis value = callPython (Some "InputHandler") "onJoystickAxis" [| id; name; axis; value |]
 
-    { onRender = onRender; onKeyDown = onKeyDown; onKeyUp = onKeyUp;
+    window.Run({ onRender = onRender; onKeyDown = onKeyDown; onKeyUp = onKeyUp;
       onJoystickButtonDown = onJoystickButtonDown; onJoystickButtonUp = onJoystickButtonUp;
-      onJoystickAxis = onJoystickAxis}
+      onJoystickAxis = onJoystickAxis})
 
 let run():unit=
-    let window=new Engine.Window()    
-    window.Run(loadMain(fun () -> window.Close()))
+    runMain()
     GC.Collect()
     GC.WaitForPendingFinalizers()
     

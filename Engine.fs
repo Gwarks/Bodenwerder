@@ -218,6 +218,21 @@ type Window()=
             Thread.Sleep(1)
             Me.Context.SwapBuffers()
 
+    member Me.GetJoystickInfos() =
+        let list = new System.Collections.Generic.List<obj>()
+        for i in 0 .. 15 do
+            if GLFW.JoystickPresent(i) then
+                let name = 
+                    match joystickNames.TryGetValue(i) with
+                    | true, n -> n
+                    | false, _ -> GLFW.GetJoystickName(i)
+                let axes = GLFW.GetJoystickAxes(i).ToArray()
+                let buttons = 
+                    GLFW.GetJoystickButtons(i).ToArray() 
+                    |> Array.map (fun b -> b = JoystickInputAction.Press)
+                list.Add((i, name, axes, buttons))
+        list
+
     override Me.OnResize(e: ResizeEventArgs)=
         GL.Viewport(0,0,e.Width,e.Height)
         base.OnResize(e)
