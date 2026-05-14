@@ -4,6 +4,7 @@ open System.Collections.Concurrent
 open System
 open System.Dynamic
 open System.Reflection
+open System.Runtime.InteropServices
 
 module WeakSingleton =
     let private instances = ConcurrentDictionary<Type, WeakReference>()
@@ -55,6 +56,24 @@ let private findBestMethod (methods: seq<MethodBase>) (args: obj[]) =
     |> Seq.tryHead
     |> Option.map fst
 
+let private getArgDescription (args: obj[]) =
+    args 
+    |> Array.map (fun a -> if isNull a then "None" else a.GetType().Name)
+    |> String.concat ", "
+
+let private getMethodDescription (m: MethodBase) =
+    let ps = m.GetParameters()
+    let pDesc = ps |> Array.map (fun p -> sprintf "%s %s" p.ParameterType.Name p.Name) |> String.concat ", "
+    sprintf "(%s)" pDesc
+
+let private failWithNoMatch (name: string) (methods: seq<MethodBase>) (args: obj[]) =
+    let actual = getArgDescription args
+    let candidates = 
+        methods 
+        |> Seq.map (fun m -> "  - " + getMethodDescription m)
+        |> String.concat "\n"
+    failwithf "No matching overload found for '%s'.\nProvided: (%s)\nCandidates:\n%s" name actual candidates
+
 let private convertArgs (ps: ParameterInfo[]) (args: obj[]) =
     Array.mapi (fun i arg ->
         let targetType = ps.[i].ParameterType
@@ -66,9 +85,9 @@ let private convertArgs (ps: ParameterInfo[]) (args: obj[]) =
 // ----------------------------
 // Wrapper für Methodengruppen (Overloads)
 // ----------------------------
-type MethodGroupWrapper(methods: seq<MethodBase>) =
+type MethodGroupWrapper(name: string, methods: seq<MethodBase>) =
     inherit DynamicObject()
-    override _.TryInvoke(binder, args, result) =
+    override _.TryInvoke(binder: InvokeBinder, args: obj[], [<Out>] result: obj byref) =
         match findBestMethod methods args with
         | Some m ->
             let ps = m.GetParameters()
@@ -76,8 +95,7 @@ type MethodGroupWrapper(methods: seq<MethodBase>) =
             result <- m.Invoke(null, converted)
             true
         | None ->
-            result <- null
-            false        
+            failWithNoMatch name methods args
 
 // ----------------------------
 // Wrapper für .NET Typen
@@ -88,9 +106,8 @@ type TypeWrapper(t: Type) =
     // ----------------------------
     // __call__ → Konstruktor
     // ----------------------------
-    override _.TryInvoke(_, args: obj[], result: byref<obj>) =
+    override _.TryInvoke(binder: InvokeBinder, args: obj[], [<Out>] result: obj byref) =
         let ctors = t.GetConstructors() |> Seq.cast<MethodBase>
-
         match findBestMethod ctors args with
         | Some ctor ->
             let ps = ctor.GetParameters()
@@ -98,13 +115,12 @@ type TypeWrapper(t: Type) =
             result <- (ctor :?> ConstructorInfo).Invoke(converted)
             true
         | None ->
-            result <- null
-            false
+            failWithNoMatch t.Name ctors args
 
     // ----------------------------
     // Zugriff: obj.X
     // ----------------------------
-    override _.TryGetMember(binder: GetMemberBinder, result: byref<obj>) =
+    override _.TryGetMember(binder: GetMemberBinder, [<Out>] result: obj byref) =
         let name = binder.Name
 
         // Property?
@@ -126,7 +142,7 @@ type TypeWrapper(t: Type) =
                     |> Seq.cast<MethodBase>
 
                 if not (Seq.isEmpty methods) then
-                    result <- MethodGroupWrapper(methods)
+                    result <- MethodGroupWrapper(name, methods)
                     true
                 else
                     result <- null
@@ -135,7 +151,7 @@ type TypeWrapper(t: Type) =
     // ----------------------------
     // Direkter Methodenaufruf: obj.Method(...)
     // ----------------------------
-    override Me.TryInvokeMember(binder: InvokeMemberBinder, args: obj[], result: byref<obj>) =
+    override Me.TryInvokeMember(binder: InvokeMemberBinder, args: obj[], [<Out>] result: obj byref) =
         let methods =
             t.GetMethods(BindingFlags.Public ||| BindingFlags.Static)
             |> Array.filter (fun m -> m.Name = binder.Name)
@@ -148,5 +164,4 @@ type TypeWrapper(t: Type) =
             result <- m.Invoke(null, converted)
             true
         | None ->
-            result <- null
-            false
+            failWithNoMatch binder.Name methods args

@@ -7,11 +7,47 @@ open OpenTK.Mathematics
 open OpenTK.Windowing.GraphicsLibraryFramework
 open IronPython.Hosting
 open IronPython.Runtime
+open Microsoft.Scripting.Hosting
 
 //type TextureQuad(texture,)=
     
 
-type Interface(window: Engine.Window)=
+type Interface(window: Engine.Window, engine: Microsoft.Scripting.Hosting.ScriptEngine)=
+    let mutable currentOnRender: obj = null
+    let mutable currentInputHandler: obj = null
+    
+    member Me.setRenderer(onRender: obj) =
+        let old = currentOnRender
+        currentOnRender <- onRender
+        old
+
+    member Me.setInputHandler(inputHandler: obj) =
+        let old = currentInputHandler
+        currentInputHandler <- inputHandler
+        old
+    member Me.closeEngine()=
+        window.Close()
+
+    member internal Me.FormatPyError(ex: Exception) =
+        let eo = engine.GetService<ExceptionOperations>()
+        eo.FormatException(ex)
+
+    member internal Me.DoRender(size: Vector2i) =
+        if not (isNull currentOnRender) then
+            try engine.Operations.Invoke(currentOnRender, size) |> ignore
+            with ex -> 
+                printfn "Critical Python Exception in onRender:\n%s" (Me.FormatPyError ex)
+                window.Close()
+
+    member internal Me.DoInput(funcName: string, args: obj[]) =
+        if not (isNull currentInputHandler) then
+            try
+                let m = engine.Operations.GetMember(currentInputHandler, funcName)
+                if engine.Operations.IsCallable(m) then engine.Operations.Invoke(m, args) |> ignore
+            with ex -> 
+                printfn "Critical Python Exception in %s:\n%s" funcName (Me.FormatPyError ex)
+                window.Close()
+
     member Me.createSurfaceRGBA(width:int, height:int)=
         Engine.Canvas.createSurfaceRGBA(width,height)
     member Me.getTextRenderer(size:float32):Engine.Canvas.TextRenderer=
@@ -94,42 +130,27 @@ let runMain()=
     engine.SetSearchPaths(searchPaths)
 
     let scope=engine.CreateScope()
+    let interfaceInstance = Interface(window, engine)
 
     let sys = Python.GetSysModule(engine)
     let modules = sys.GetVariable<System.Collections.Generic.IDictionary<string, obj>>("modules")
-    modules.["Interface"] <- Interface(window)
+    modules.["Interface"] <- interfaceInstance
 
-    let callPython (objName: string option) (funcName: string) (args: obj[]) =
-        let target = 
-            match objName with
-            | Some name -> 
-                match scope.TryGetVariable<obj>(name) with
-                | true, o -> Some o
-                | _ -> None
-            | None -> Some (scope :> obj)
-
-        try
-            match target with
-            | Some t ->
-                let memberObj = if objName.IsSome then engine.Operations.GetMember(t, funcName) else scope.GetVariable<obj>(funcName)
-                if engine.Operations.IsCallable(memberObj) then
-                    engine.Operations.Invoke(memberObj, args) |> ignore
-            | None -> ()
-        with ex ->
-            printfn "Critical Python Exception in %s: %O" funcName ex
-            window.Close()
-
-    engine.ExecuteFile(Path.Combine(dataPath, "main.py"), scope) |> ignore
+    try
+        engine.ExecuteFile(Path.Combine(dataPath, "main.py"), scope) |> ignore
+    with ex ->
+        printfn "Fatal error loading main.py:\n%s" (interfaceInstance.FormatPyError ex)
+        exit 1
 
     let onRender(size:Vector2i)=
         GL.Clear(ClearBufferMask.ColorBufferBit ||| ClearBufferMask.DepthBufferBit)            
-        callPython None "onRender" [| size |]
+        interfaceInstance.DoRender(size)
 
-    let onKeyDown k = callPython (Some "InputHandler") "onKeyDown" [| k |]
-    let onKeyUp k = callPython (Some "InputHandler") "onKeyUp" [| k |]
-    let onJoystickButtonDown id name btn = callPython (Some "InputHandler") "onJoystickButtonDown" [| id; name; btn |]
-    let onJoystickButtonUp id name btn = callPython (Some "InputHandler") "onJoystickButtonUp" [| id; name; btn |]
-    let onJoystickAxis id name axis value = callPython (Some "InputHandler") "onJoystickAxis" [| id; name; axis; value |]
+    let onKeyDown k = interfaceInstance.DoInput("onKeyDown", [| k |])
+    let onKeyUp k = interfaceInstance.DoInput("onKeyUp", [| k |])
+    let onJoystickButtonDown id name btn = interfaceInstance.DoInput("onJoystickButtonDown", [| id; name; btn |])
+    let onJoystickButtonUp id name btn = interfaceInstance.DoInput("onJoystickButtonUp", [| id; name; btn |])
+    let onJoystickAxis id name axis value = interfaceInstance.DoInput("onJoystickAxis", [| id; name; axis; value |])
 
     window.Run({ onRender = onRender; onKeyDown = onKeyDown; onKeyUp = onKeyUp;
       onJoystickButtonDown = onJoystickButtonDown; onJoystickButtonUp = onJoystickButtonUp;

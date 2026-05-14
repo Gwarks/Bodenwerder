@@ -10,12 +10,13 @@ def f(v):
     k2=Kugel(v+I.Vector3(0.4,0.0,0.0),.5,(0.0,1.0,0.0))
     return sdfUnion(k1,k2)
 
+NAME='Zwei SDF Kugeln und ein bewegliches Rechteck'
+
 class Test:
-    def __init__(Me):
+    def __init__(Me,back):
         Me.tq=I.getTextureQuad()        
         Me.t=I.createTexture(256,256,4,bytes(itertools.chain.from_iterable((x,y,0,255) for y in range(256) for x in range(256))))
         Me.pos=I.Vector2i(0,0)
-        Me.cur=0
         Me.sp=I.createShaderProgram([("""
 #version 330 core
 in vec3 aPosition;
@@ -42,6 +43,7 @@ void main()
         b=b''.join(struct.pack('=fff fff',x,y,z,*o) for x,y,z,o in sdf)
         aa=Me.sp.getActiveAttributes()
         Me.va=I.createVertexArray([aa[x] for x in ('aPosition','aColor')],b,I.PrimitiveType.Triangles)
+        Me.Back=back
     def onRender(Me,size):
         angle = time.perf_counter()
         aspect = float(size.X) / float(size.Y)
@@ -63,7 +65,3 @@ void main()
         Me.pos+=I.Vector2i(0,-1)
     def Down(Me):
         Me.pos+=I.Vector2i(0,1)
-    def Action(Me):
-        Me.cur=1
-    def Back(Me):
-        Me.cur=0
