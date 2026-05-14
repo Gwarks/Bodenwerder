@@ -8,6 +8,7 @@ Bodenwerder ist eine Grafik-Engine, die auf F# und OpenTK basiert. Sie integrier
 * **Scripting (Python)**: Die Hauptlogik befindet sich in Python-Skripten (z.B. `lt.cmdr.data/main.py`), die über eine Bridge auf die Engine zugreifen.
 * **UI/Text**: Text-Rendering mittels SkiaSharp mit Unterstützung für Noto Fonts und Emojis.
 *   **Input**: Unterstützung für Tastatur und mehrere Joysticks/Gamepads mit Flankenerkennung für Buttons.
+*   **Fehlerbehandlung**: Detaillierte Python-Tracebacks (inkl. Zeilennummern) und aussagekräftige Fehlermeldungen bei falschen .NET-Methodenaufrufen.
 * **Geometrie**: Enthält eine Half-Edge Datenstruktur (`Mesh.fs`) zur Verarbeitung und Triangulierung (Ear Clipping) von Polygon-Meshes.
 
 ## Coding Style
@@ -30,6 +31,20 @@ Das Modul `Interface` (in Python oft als `I` importiert) stellt Funktionen für 
 *   `setBackgroundColor(color: Color4)`: Setzt die Clear-Color des Fensters.
 *   `setDepthTest(enable: bool)`: Aktiviert oder deaktiviert den OpenGL Depth-Test (Z-Buffer).
 *   `getJoysticks() -> list`: Liefert eine Liste aller aktiven Joysticks als Tuples `(id, name, axes, buttons)`.
+
+### Debugging & Fehlerbehandlung
+
+Die Engine bietet spezialisierte Fehlermeldungen für die Interaktion zwischen Python und .NET:
+
+*   **Syntax-Fehler**: Beim Laden von Skripten (z.B. `main.py`) werden Syntaxfehler mit Pfad, Zeile und Code-Ausschnitt direkt in der Konsole ausgegeben.
+*   **Runtime-Exceptions**: Tritt ein Fehler in `onRender` oder einem Input-Callback auf, wird ein vollständiger Python-Traceback angezeigt, bevor die Engine sicher schließt.
+*   **Overload-Fehler**: Wenn eine .NET-Funktion (wie `I.Color4(...)`) mit den falschen Parametern aufgerufen wird, listet die Engine:
+    1. Den Namen der Funktion/des Typs.
+    2. Die Typen der tatsächlich übergebenen Argumente.
+    3. Eine Liste aller verfügbaren .NET-Überladungen (Kandidaten) inklusive Parameternamen und Typen.
+
+Beispiel: `No matching overload found for 'Color4'. Provided: (Single, Single, Single)`.
+
 
 ### Typen und Konstanten
 
@@ -63,26 +78,41 @@ Das Modul `Interface` (in Python oft als `I` importiert) stellt Funktionen für 
 
 ## Skript-Schnittstelle (Callbacks)
 
-Die Engine erwartet eine bestimmte Struktur in der `main.py`, um Events an das Skript weiterzureichen.
+Die Engine kommuniziert mit dem Python-Skript über Callbacks, die beim Start (üblicherweise in der `main.py`) registriert werden müssen.
 
-### Globale Funktionen
-*   `onRender(size: Vector2i)`: Haupt-Render-Callback. Wird in jedem Frame aufgerufen.
+### Registrierung
 
-### Das InputHandler-Objekt
-Alle Eingabe-Events werden an ein globales Objekt namens `InputHandler` gesendet. Dieses muss folgende Methoden (optional) implementieren:
+*   `setRenderer(func)`: Registriert die Funktion für den Render-Loop. Sie empfängt die aktuelle Fenstergröße (`Vector2i`).
+*   `setInputHandler(obj)`: Registriert ein Objekt für Eingabe-Events. Die Engine sucht auf diesem Objekt nach spezifischen Methoden (siehe unten).
+*   `closeEngine()`: Beendet die Engine und schließt das Fenster.
+
+### Beispiel `main.py`
 
 ```python
+import Interface as I
+
+def onRender(size):
+    # Haupt-Render-Loop. size.X und size.Y enthalten die Dimensionen.
+    pass
+
 class MyHandler:
-    def onKeyDown(self, key):
-        pass
-    def onKeyUp(self, key):
-        pass
-    def onJoystickButtonDown(self, id, name, button):
-        pass
-    def onJoystickButtonUp(self, id, name, button):
-        pass
-    def onJoystickAxis(self, id, name, axis, value):
+    def onKeyDown(Me, key):
+        if key == I.Keys['Escape']:
+            I.closeEngine()
+
+    def onKeyUp(Me, key):
         pass
 
-InputHandler = MyHandler()
+    def onJoystickButtonDown(Me, id, name, button):
+        pass
+
+    def onJoystickButtonUp(Me, id, name, button):
+        pass
+
+    def onJoystickAxis(Me, id, name, axis, value):
+        pass
+
+# Callbacks an die Engine binden 
+I.setRenderer(onRender)
+I.setInputHandler(MyHandler())
 ```
