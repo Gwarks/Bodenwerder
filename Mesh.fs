@@ -16,6 +16,27 @@ and HEHalfEdge<'Data>() =
     member val Face: HEFace<'Data> option = None with get, set
     member val Data: 'Data = Unchecked.defaultof<'Data> with get, set
 
+[<Struct>]
+type AABB =
+    val Min: Vector3
+    val Max: Vector3
+    new(min, max) = { Min = min; Max = max }
+    static member FromPoints (pts: seq<Vector3>) =
+        let mutable mi = Vector3(System.Single.PositiveInfinity)
+        let mutable ma = Vector3(System.Single.NegativeInfinity)
+        for p in pts do
+            mi.X <- min mi.X p.X; mi.Y <- min mi.Y p.Y; mi.Z <- min mi.Z p.Z
+            ma.X <- max ma.X p.X; ma.Y <- max ma.Y p.Y; ma.Z <- max ma.Z p.Z
+        AABB(mi, ma)
+    static member Merge (a: AABB) (b: AABB) =
+        AABB(Vector3(min a.Min.X b.Min.X, min a.Min.Y b.Min.Y, min a.Min.Z b.Min.Z),
+             Vector3(max a.Max.X b.Max.X, max a.Max.Y b.Max.Y, max a.Max.Z b.Max.Z))
+
+type AABBNode<'Data> =
+    | AABBLeaf of AABB * HEFace<'Data>[]
+    | AABBInternal of AABB * AABBNode<'Data> * AABBNode<'Data>
+    member Me.Bounds = match Me with | AABBLeaf(b, _) -> b | AABBInternal(b, _, _) -> b
+
 type HalfEdgeMesh<'Data>() =
     let vertices = System.Collections.Generic.List<HEVertex<'Data>>()
     let faces = System.Collections.Generic.List<HEFace<'Data>>()
@@ -151,6 +172,69 @@ type HalfEdgeMesh<'Data>() =
                                 i <- i + 1
                 | None -> ()
         }
+
+    member private Me.GetFaceVertices(face: HEFace<'Data>) =
+        let pts = System.Collections.Generic.List<Vector3>()
+        match face.Edge with
+        | Some startEdge ->
+            let mutable curr = startEdge
+            let mutable loop = true
+            while loop do
+                match curr.Vertex with | Some v -> pts.Add(v.Position) | None -> ()
+                match curr.Next with
+                | Some next -> if next = startEdge then loop <- false else curr <- next
+                | None -> loop <- false
+        | None -> ()
+        pts
+
+    member Me.CreateAABBTree() =
+        let faceData = 
+            faces 
+            |> Seq.map (fun f -> 
+                let verts = Me.GetFaceVertices f
+                let bounds = AABB.FromPoints verts
+                let center = (bounds.Min + bounds.Max) * 0.5f
+                (bounds, center, f))
+            |> Seq.toArray
+
+        let rec build (items: (AABB * Vector3 * HEFace<'Data>)[]) =
+            let totalBounds = 
+                if items.Length = 0 then AABB(Vector3.Zero, Vector3.Zero)
+                else 
+                    let mutable b = items.[0] |> (fun (x,_,_) -> x)
+                    for i in 1 .. items.Length - 1 do
+                        let (cur, _, _) = items.[i]
+                        b <- AABB.Merge b cur
+                    b
+            
+            if items.Length <= 4 then
+                AABBLeaf(totalBounds, items |> Array.map (fun (_, _, f) -> f))
+            else
+                let size = totalBounds.Max - totalBounds.Min
+                let axis = if size.X > size.Y && size.X > size.Z then 0 elif size.Y > size.Z then 1 else 2
+                let sorted = 
+                    match axis with 
+                    | 0 -> items |> Array.sortBy (fun (_, c, _) -> c.X) 
+                    | 1 -> items |> Array.sortBy (fun (_, c, _) -> c.Y) 
+                    | _ -> items |> Array.sortBy (fun (_, c, _) -> c.Z)
+                let mid = sorted.Length / 2
+                AABBInternal(totalBounds, build sorted.[..mid-1], build sorted.[mid..])
+
+        if faces.Count = 0 then None else Some (build faceData)
+
+    member Me.CalculateVolume() =
+        let mutable volume = 0.0
+        for face in faces do
+            let pts = Me.GetFaceVertices face
+            if pts.Count >= 3 then
+                let mutable areaSum = Vector3.Zero
+                for i in 0 .. pts.Count - 1 do
+                    let pCurrent = pts.[i]
+                    let pNext = pts.[(i + 1) % pts.Count]
+                    areaSum <- areaSum + Vector3.Cross(pCurrent, pNext)
+                // Das vorzeichenbehaftete Volumen des Pyramiden-Segments zum Ursprung (Spatprodukt-Summe)
+                volume <- volume + float (Vector3.Dot(pts.[0], areaSum))
+        volume / 6.0
 
     member Me.Map<'NewData>(mapping: HEHalfEdge<'Data> -> 'NewData) : HalfEdgeMesh<'NewData> =
         let nm = HalfEdgeMesh<'NewData>()

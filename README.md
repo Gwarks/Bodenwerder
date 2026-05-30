@@ -27,6 +27,7 @@ Das Modul `Interface` (in Python oft als `I` importiert) stellt Funktionen für 
 *   `createShaderProgram(shaders: list) -> ShaderProgram`: Erstellt ein Shader-Programm. Erwartet eine Liste von Tupeln `(SourceCode, ShaderType)`.
 *   `createVertexArray(attributes: list|dict, vertices: bytes, primitive_type: PrimitiveType) -> VertexArray`: Erstellt ein Vertex-Array (VAO) aus Attribut-Definitionen und Vertex-Daten.
 *   `createMeshFromSDF(min: Vector3, max: Vector3, res: Vector3i, sdf: function) -> HalfEdgeMesh`: Erzeugt ein Mesh aus einer Signed Distance Function (SDF).
+*   `createCubeMesh(center: Vector3, size: float, data: object) -> HalfEdgeMesh`: Erzeugt einen Würfel als Half-Edge Mesh.
 *   `getConfigPath() -> string`: Liefert den Pfad zum AppData-Verzeichnis.
 *   `setBackgroundColor(color: Color4)`: Setzt die Clear-Color des Fensters.
 *   `setDepthTest(enable: bool)`: Aktiviert oder deaktiviert den OpenGL Depth-Test (Z-Buffer).

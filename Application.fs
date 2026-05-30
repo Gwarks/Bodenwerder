@@ -105,6 +105,30 @@ type Interface(window: Engine.Window, engine: Microsoft.Scripting.Hosting.Script
             let result = sdf.Invoke(p) :?> System.Collections.Generic.IList<obj>
             (Convert.ToSingle(result.[0]), result.[1])
         Mesh.HalfEdgeMesh<obj>.FromSDF(min, max, res, sdfWrapper)
+    member Me.createCubeMesh(center: Vector3, size: float32, data: obj) =
+        let h = size * 0.5f
+        let coords = [|
+            center + Vector3(-h, -h, -h) // 0
+            center + Vector3( h, -h, -h) // 1
+            center + Vector3( h,  h, -h) // 2
+            center + Vector3(-h,  h, -h) // 3
+            center + Vector3(-h, -h,  h) // 4
+            center + Vector3( h, -h,  h) // 5
+            center + Vector3( h,  h,  h) // 6
+            center + Vector3(-h,  h,  h) // 7
+        |]
+        // Jede Fläche ist ein Quad (4 Indizes), CCW von außen gesehen
+        let faces = [|
+            [| (4, data); (5, data); (6, data); (7, data) |] :> seq<int * obj> // Vorne (+Z)
+            [| (1, data); (0, data); (3, data); (2, data) |] :> seq<int * obj> // Hinten (-Z)
+            [| (1, data); (5, data); (6, data); (2, data) |] :> seq<int * obj> // Rechts (+X)
+            [| (4, data); (0, data); (3, data); (7, data) |] :> seq<int * obj> // Links (-X)
+            [| (3, data); (2, data); (6, data); (7, data) |] :> seq<int * obj> // Oben (+Y)
+            [| (0, data); (1, data); (5, data); (4, data) |] :> seq<int * obj> // Unten (-Y)
+        |]
+        let mesh = Mesh.HalfEdgeMesh<obj>()
+        mesh.Build(coords, faces)
+        mesh
     member Me.getJoysticks() =
         window.GetJoystickInfos()
     member Me.PrimitiveType = Tools.TypeWrapper(typeof<PrimitiveType>)
