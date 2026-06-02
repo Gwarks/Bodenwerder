@@ -6,7 +6,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="Tools.fs" /><Compile Include="Mesh.fs" />
+    <Compile Include="Tools.fs" />
+    <Compile Include="Mesh.fs" />
     <Compile Include="Engine.Tools.fs" />
     <Compile Include="Engine.fs" />
     <Compile Include="Engine.Canvas.fs" />
