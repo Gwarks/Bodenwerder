@@ -115,17 +115,17 @@ type Interface(window: Engine.Window, engine: Microsoft.Scripting.Hosting.Script
     member Me.CSGsubstraction(meshA: Mesh.HalfEdgeMesh<obj>, meshB: Mesh.HalfEdgeMesh<obj>, dataFunc: Func<obj, obj, float32, obj>) =
         let df (d1: obj) (d2: obj) (t: float32) = dataFunc.Invoke(d1, d2, t)
         Mesh.CSG.subtraction df meshA meshB
-    member Me.createCubeMesh(center: Vector3, size: float32, data: obj) =
+    member Me.createCubeMesh(center: Vector3, size: Vector3, data: obj) =
         let h = size * 0.5f
         let coords = [|
-            center + Vector3(-h, -h, -h) // 0
-            center + Vector3( h, -h, -h) // 1
-            center + Vector3( h,  h, -h) // 2
-            center + Vector3(-h,  h, -h) // 3
-            center + Vector3(-h, -h,  h) // 4
-            center + Vector3( h, -h,  h) // 5
-            center + Vector3( h,  h,  h) // 6
-            center + Vector3(-h,  h,  h) // 7
+            center + Vector3(-h.X, -h.Y, -h.Z) // 0
+            center + Vector3( h.X, -h.Y, -h.Z) // 1
+            center + Vector3( h.X,  h.Y, -h.Z) // 2
+            center + Vector3(-h.X,  h.Y, -h.Z) // 3
+            center + Vector3(-h.X, -h.Y,  h.Z) // 4
+            center + Vector3( h.X, -h.Y,  h.Z) // 5
+            center + Vector3( h.X,  h.Y,  h.Z) // 6
+            center + Vector3(-h.X,  h.Y,  h.Z) // 7
         |]
         // Jede Fläche ist ein Quad (4 Indizes), CCW von außen gesehen
         let faces = [|

@@ -28,8 +28,8 @@ void main()
 }
 """,I.ShaderType.FragmentShader)
 ])
-        ma=I.createCubeMesh(I.Vector3(0.0,0.0,0.0),1.0,(0.0,1.0,0.0))
-        mb=I.createCubeMesh(I.Vector3(-0.5,-0.5,-0.5),1.0,(1.0,0.0,0.0))
+        ma=I.createCubeMesh(I.Vector3(0.0,0.0,0.0),I.Vector3(1.0),(0.0,1.0,0.0))
+        mb=I.createCubeMesh(I.Vector3(-0.5,-0.5,-0.5),I.Vector3(1.0),(1.0,0.0,0.0))
         def f(d1,d2,t):
             mt=1-t
             return (d1[0]*mt+d2[0]*t,d1[1]*mt+d2[1]*t,d1[2]*mt+d2[2]*t)
