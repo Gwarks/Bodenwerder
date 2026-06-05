@@ -160,7 +160,7 @@ type EngineCallbacks = {
 }
 
 type Window()=
-    inherit NativeWindow(NativeWindowSettings(Title = "Mein maximiertes OpenTK-Fenster",
+    inherit NativeWindow(NativeWindowSettings(Title = "Bodenwerder",
                                             ClientSize = Vector2i(512, 256),  // Startgröße (wird ignoriert bei Maximized)
                                             WindowState = WindowState.Maximized,  // Das macht es maximized!
                                             WindowBorder = WindowBorder.Resizable))

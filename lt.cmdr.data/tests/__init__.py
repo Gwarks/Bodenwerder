@@ -15,6 +15,7 @@ class Menu:
     Me.bi=bi
     Me.ip=bi.getInputProcessor(Me)
     Me.t_selector=tr.renderText('🐑🦈')
+    I.setTitle('Bodenwerder: Beispiele')
   def activate(Me):
     I.setBackgroundColor(I.Color4(0.5,0.2,0.5,0))
     I.setRenderer(Me.onRender)

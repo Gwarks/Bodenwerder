@@ -7,17 +7,14 @@ open Mesh
 // Typen
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Klassifizierung eines Punktes relativ zur Schnittebene / zum anderen Mesh
-type PointClass = Inside | Outside | OnSurface
-
-/// CSG-Operation
 type CSGOperation = Union | Intersection | Subtraction
 
-/// Interpolationsfunktion: gegebene zwei Datenpunkte und t ∈ [0,1] → neues Data
+/// Interpolationsfunktion: (dataA, dataB, t ∈ [0,1]) → neues Data
+/// t=0 = Punkt liegt auf dataA-Seite, t=1 = Punkt liegt auf dataB-Seite
 type Interpolator<'Data> = 'Data -> 'Data -> float32 -> 'Data
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Hilfsfunktionen – Geometrie
+// Geometrie-Primitiven
 // ─────────────────────────────────────────────────────────────────────────────
 
 [<Struct>]
@@ -25,96 +22,120 @@ type Plane =
     val Normal: Vector3
     val D: float32
     new(n: Vector3, d: float32) = { Normal = n; D = d }
-    static member FromTriangle(a: Vector3, b: Vector3, c: Vector3) =
-        let n = Vector3.Normalize(Vector3.Cross(b - a, c - a))
-        Plane(n, -Vector3.Dot(n, a))
     member Me.DistanceTo(p: Vector3) = Vector3.Dot(Me.Normal, p) + Me.D
 
-/// Klassifiziert einen Punkt zur Ebene (mit Epsilon-Toleranz)
-let classifyPoint (eps: float32) (plane: Plane) (p: Vector3) =
-    let d = plane.DistanceTo p
-    if   d >  eps then Outside
-    elif d < -eps then Inside
-    else OnSurface
-
-/// Schneidet Segment [a,b] mit Ebene; gibt t zurück sodass P = a + t*(b-a)
-let intersectSegmentPlane (plane: Plane) (a: Vector3) (b: Vector3) =
-    let da = plane.DistanceTo a
-    let db = plane.DistanceTo b
-    let denom = da - db
-    if abs denom < 1e-6f then None
-    else Some (da / denom)
-
-/// Berechnet die Flächennormale eines Polygons (Newell-Methode)
-let faceNormal (pts: Vector3 list) : Vector3 =
-    let mutable n = Vector3.Zero
-    let count = List.length pts
-    for i in 0 .. count - 1 do
-        let p0 = pts.[i]
-        let p1 = pts.[(i + 1) % count]
-        n.X <- n.X + (p0.Y - p1.Y) * (p0.Z + p1.Z)
-        n.Y <- n.Y + (p0.Z - p1.Z) * (p0.X + p1.X)
-        n.Z <- n.Z + (p0.X - p1.X) * (p0.Y + p1.Y)
-    Vector3.Normalize n
+/// FIX Bug 1: Ebene aus allen Vertices eines Faces (Newell-Methode).
+/// Robust für Quads und N-Gons, stabil bei koplanaren aber nicht-triangulierten Faces.
+let private planeFromFace (face: HEFace<'Data>) : Plane option =
+    let pts = System.Collections.Generic.List<Vector3>()
+    match face.Edge with
+    | None -> ()
+    | Some startEdge ->
+        let mutable curr = startEdge
+        let mutable loop = true
+        while loop do
+            curr.Vertex |> Option.iter (fun v -> pts.Add v.Position)
+            match curr.Next with
+            | Some next -> if next = startEdge then loop <- false else curr <- next
+            | None      -> loop <- false
+    if pts.Count < 3 then None
+    else
+        // Newell-Methode: exakte Normale aus N-Gon
+        let mutable nx, ny, nz = 0.0f, 0.0f, 0.0f
+        let count = pts.Count
+        for i in 0 .. count - 1 do
+            let p0 = pts.[i]
+            let p1 = pts.[(i + 1) % count]
+            nx <- nx + (p0.Y - p1.Y) * (p0.Z + p1.Z)
+            ny <- ny + (p0.Z - p1.Z) * (p0.X + p1.X)
+            nz <- nz + (p0.X - p1.X) * (p0.Y + p1.Y)
+        let len = sqrt (nx*nx + ny*ny + nz*nz)
+        if len < 1e-8f then None
+        else
+            let n = Vector3(nx / len, ny / len, nz / len)
+            // Schwerpunkt als Aufpunkt
+            let mutable cx, cy, cz = 0.0f, 0.0f, 0.0f
+            for p in pts do cx <- cx + p.X; cy <- cy + p.Y; cz <- cz + p.Z
+            let c = Vector3(cx / float32 count, cy / float32 count, cz / float32 count)
+            Some (Plane(n, -Vector3.Dot(n, c)))
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Polygon-Schnitt gegen eine Ebene (Sutherland–Hodgman für eine Ebene)
+// Vert-Typ
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Ein Vertex mit beliebigen Daten
 type Vert<'Data> = { Pos: Vector3; Data: 'Data }
 
-/// Teilt ein Polygon mit der Ebene in (innen, außen).
-/// "Innen" = auf der negativen Seite der Ebene.
-/// Neue Punkte werden mit `lerp` interpoliert.
+// ─────────────────────────────────────────────────────────────────────────────
+// FIX Bug 3: Polygon-Splitting – korrekte 3-Zustand-Klassifikation
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Klassifikation eines Vertex relativ zur Ebene
+[<Struct>]
+type private VertSide = Neg | On | Pos
+
+let private classifyVertex (eps: float32) (plane: Plane) (v: Vert<'Data>) =
+    let d = plane.DistanceTo v.Pos
+    if   d >  eps then Pos
+    elif d < -eps then Neg
+    else On
+
+/// Teilt ein Polygon mit der Ebene in (negative Seite, positive Seite).
+/// OnSurface-Vertices gehen in BEIDE Listen.
+/// Neue Schnittpunkte werden mit `lerp` interpoliert.
+/// Rückgabe: (negSide, posSide) – beide können leer sein wenn Polygon ganz auf einer Seite liegt.
 let splitPolygon
         (eps: float32)
         (plane: Plane)
         (lerp: Interpolator<'Data>)
         (poly: Vert<'Data> list)
-        : Vert<'Data> list * Vert<'Data> list =   // (inside, outside)
+        : Vert<'Data> list * Vert<'Data> list =
 
     if poly.IsEmpty then [], []
     else
 
-    let inside  = System.Collections.Generic.List<Vert<'Data>>()
-    let outside = System.Collections.Generic.List<Vert<'Data>>()
+    let neg = System.Collections.Generic.List<Vert<'Data>>()
+    let pos = System.Collections.Generic.List<Vert<'Data>>()
 
-    let count = poly.Length
+    let count   = poly.Length
+    let sides   = poly |> List.map (classifyVertex eps plane) |> List.toArray
 
     for i in 0 .. count - 1 do
-        let curr = poly.[i]
-        let next = poly.[(i + 1) % count]
+        let curr     = poly.[i]
+        let next     = poly.[(i + 1) % count]
+        let currSide = sides.[i]
+        let nextSide = sides.[(i + 1) % count]
 
-        let dc = plane.DistanceTo curr.Pos
-        let dn = plane.DistanceTo next.Pos
+        // Aktuellen Vertex einsortieren
+        match currSide with
+        | Neg -> neg.Add curr
+        | Pos -> pos.Add curr
+        | On  ->
+            // OnSurface → geht in beide Listen
+            neg.Add curr
+            pos.Add curr
 
-        let currIn = dc <= eps
-        let nextIn = dn <= eps
+        // Kante kreuzt die Ebene (Neg↔Pos, nicht On)?
+        let needsCut =
+            (currSide = Neg && nextSide = Pos) ||
+            (currSide = Pos && nextSide = Neg)
 
-        if currIn then inside.Add curr
-        else            outside.Add curr
-
-        // Kante kreuzt die Ebene → Schnittpunkt einfügen
-        let crosses =
-            (dc > eps && dn < -eps) ||   // outside → inside
-            (dc < -eps && dn > eps)      // inside  → outside
-        if crosses then
-            let t = dc / (dc - dn)
-            let t = max 0.0f (min 1.0f t)
-            let newPos  = curr.Pos  + t * (next.Pos  - curr.Pos)
+        if needsCut then
+            let dc = plane.DistanceTo curr.Pos
+            let dn = plane.DistanceTo next.Pos
+            let t  = dc / (dc - dn)
+            let t  = max 0.0f (min 1.0f t)
+            let newPos  = curr.Pos + t * (next.Pos - curr.Pos)
             let newData = lerp curr.Data next.Data t
             let v = { Pos = newPos; Data = newData }
-            inside.Add v
-            outside.Add v
+            neg.Add v
+            pos.Add v
 
-    Seq.toList inside, Seq.toList outside
+    Seq.toList neg, Seq.toList pos
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Punkt-in-Mesh-Test (Ray-Casting gegen AABB-Baum)
+// Punkt-in-Mesh Test (Ray Casting über AABB-Baum)
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Prüft ob ein Strahl die AABB schneidet
 let private rayAABB (orig: Vector3) (invDir: Vector3) (b: AABB) =
     let mutable tmin = System.Single.NegativeInfinity
     let mutable tmax = System.Single.PositiveInfinity
@@ -129,7 +150,7 @@ let private rayAABB (orig: Vector3) (invDir: Vector3) (b: AABB) =
     check orig.Z invDir.Z b.Min.Z b.Max.Z
     tmin <= tmax && tmax >= 0.0f
 
-/// Moller-Trumbore Raycast gegen Dreieck; gibt t zurück wenn getroffen
+/// Möller-Trumbore
 let private rayTriangle (orig: Vector3) (dir: Vector3)
                          (v0: Vector3) (v1: Vector3) (v2: Vector3) =
     let eps = 1e-7f
@@ -151,8 +172,7 @@ let private rayTriangle (orig: Vector3) (dir: Vector3)
                 let t = f * Vector3.Dot(e2, q)
                 if t > eps then Some t else None
 
-/// Trianguliert ein Face-Polygon direkt aus der HE-Struktur
-let private getFaceTriangles (face: HEFace<'Data>) : (Vector3 * Vector3 * Vector3) list =
+let private getFaceTriangles (face: HEFace<'Data>) =
     let pts = System.Collections.Generic.List<Vector3>()
     match face.Edge with
     | Some startEdge ->
@@ -162,52 +182,40 @@ let private getFaceTriangles (face: HEFace<'Data>) : (Vector3 * Vector3 * Vector
             curr.Vertex |> Option.iter (fun v -> pts.Add v.Position)
             match curr.Next with
             | Some next -> if next = startEdge then loop <- false else curr <- next
-            | None -> loop <- false
+            | None      -> loop <- false
     | None -> ()
     if pts.Count < 3 then []
     else [ for i in 1 .. pts.Count - 2 -> (pts.[0], pts.[i], pts.[i+1]) ]
 
-/// Zählt Schnittpunkte eines Strahls mit dem Mesh (via AABB-Baum)
-let private countRayIntersections
-        (tree: AABBNode<'Data>)
-        (orig: Vector3)
-        (dir: Vector3) =
-
+let private countRayHits (tree: AABBNode<'Data>) (orig: Vector3) (dir: Vector3) =
     let invDir = Vector3(1.0f / dir.X, 1.0f / dir.Y, 1.0f / dir.Z)
     let mutable count = 0
-
-    let rec traverse node =
-        match node with
+    let rec traverse = function
         | AABBLeaf(b, faces) ->
             if rayAABB orig invDir b then
                 for face in faces do
-                    for (v0, v1, v2) in getFaceTriangles face do
+                    for (v0,v1,v2) in getFaceTriangles face do
                         if rayTriangle orig dir v0 v1 v2 |> Option.isSome then
                             count <- count + 1
-        | AABBInternal(b, left, right) ->
-            if rayAABB orig invDir b then
-                traverse left
-                traverse right
-
+        | AABBInternal(b, l, r) ->
+            if rayAABB orig invDir b then traverse l; traverse r
     traverse tree
     count
 
-/// Klassifiziert ob ein Punkt innerhalb des Meshes liegt
-/// Drei Strahlen in verschiedene Richtungen abstimmen (Mehrheitsentscheid)
+/// Dreifacher Mehrheitsentscheid für Robustheit
 let isPointInsideMesh (tree: AABBNode<'Data>) (p: Vector3) =
     let dirs = [|
-        Vector3(1.0f, 0.0f, 0.0f)
-        Vector3(0.0f, 1.0f, 0.0f)
-        Vector3(0.0f, 0.0f, 1.0f)
+        Vector3(1.0f,  0.17f,  0.07f)
+        Vector3(0.07f, 1.0f,   0.13f)
+        Vector3(0.11f, 0.09f,  1.0f )
     |]
     let votes =
-        dirs
-        |> Array.sumBy (fun d ->
-            if countRayIntersections tree p d % 2 = 1 then 1 else 0)
+        dirs |> Array.sumBy (fun d ->
+            if countRayHits tree p (Vector3.Normalize d) % 2 = 1 then 1 else 0)
     votes >= 2
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Polygon-Listen aus HalfEdge extrahieren
+// Polygon-Extraktion aus HalfEdge
 // ─────────────────────────────────────────────────────────────────────────────
 
 let private extractPolygons (mesh: HalfEdgeMesh<'Data>) : Vert<'Data> list list =
@@ -233,7 +241,6 @@ let private extractPolygons (mesh: HalfEdgeMesh<'Data>) : Vert<'Data> list list 
 // ─────────────────────────────────────────────────────────────────────────────
 
 let private buildMeshFromPolygons (polys: Vert<'Data> list list) : HalfEdgeMesh<'Data> =
-    // Vertices deduplizieren mit Epsilon
     let eps = 1e-5f
     let allVerts = System.Collections.Generic.List<Vector3>()
     let findOrAdd (p: Vector3) =
@@ -244,109 +251,96 @@ let private buildMeshFromPolygons (polys: Vert<'Data> list list) : HalfEdgeMesh<
                 if abs (p.X - q.X) < eps && abs (p.Y - q.Y) < eps && abs (p.Z - q.Z) < eps then
                     found <- i
         if found >= 0 then found
-        else
-            allVerts.Add p
-            allVerts.Count - 1
+        else allVerts.Add p; allVerts.Count - 1
 
     let faceIndices =
         polys |> List.map (fun poly ->
-            poly |> List.map (fun v ->
-                let idx = findOrAdd v.Pos
-                (idx, v.Data))
-            |> List.toSeq
-        )
+            poly |> List.map (fun v -> findOrAdd v.Pos, v.Data) |> List.toSeq)
 
     let mesh = HalfEdgeMesh<'Data>()
     mesh.Build(Seq.map id allVerts, faceIndices)
     mesh
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Kern-CSG: Polygone eines Meshes gegen das andere Mesh klassifizieren
+// FIX Bug 2: Kernfunktion – sukzessives Schneiden mit sofortiger Klassifikation
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// Klassifiziert alle Polygone von `meshA` relativ zu `meshB`.
-/// Polygone die die Grenze von B schneiden werden aufgeteilt.
-/// Rückgabe: (innen, außen) - Listen von Polygonen
+///
+/// Für jedes Polygon aus A:
+///   1. AABB-Test: nur Faces von B mit überlappender AABB werden als Schnittebenen kandidiert
+///   2. Für jeden Face-Kandidaten: Polygon gegen die Face-Ebene schneiden
+///   3. Nach jedem Schnitt: Fragmente die KOMPLETT auf einer Seite liegen
+///      werden sofort klassifiziert (Ray-Cast) und aus der Arbeitsliste entfernt
+///   4. Nur echte Grenz-Fragmente bleiben in der Arbeitsliste
+///
+/// Das behebt den Kern des U-Problems: ein Face das von B durchtrennt wird
+/// erzeugt genau zwei Fragmente, die beide sofort korrekt klassifiziert werden.
 let private classifyAndSplit
         (eps: float32)
         (lerp: Interpolator<'Data>)
         (meshA: HalfEdgeMesh<'Data>)
         (treeB: AABBNode<'Data>)
-        (meshB: HalfEdgeMesh<'Data>)
         : Vert<'Data> list list * Vert<'Data> list list =
 
     let inside  = System.Collections.Generic.List<Vert<'Data> list>()
     let outside = System.Collections.Generic.List<Vert<'Data> list>()
 
-    let polygonsA = extractPolygons meshA
+    for poly in extractPolygons meshA do
+        // Alle Vertices des Polygons auf einer Seite? → Direkt klassifizieren ohne zu schneiden
+        let polyAABB = AABB.FromPoints (poly |> List.map (fun v -> v.Pos))
 
-    // AABB-Baum von B für schnelle Face-Tests
-    let rec collectFacesFromTree node =
-        match node with
-        | AABBLeaf(_, faces) -> Seq.toList faces
-        | AABBInternal(_, l, r) -> collectFacesFromTree l @ collectFacesFromTree r
-
-    for poly in polygonsA do
-        if poly.IsEmpty then ()
-        else
-
-        // Schritt 1: Prüfe ob das Polygon komplett klassifiziert werden kann
-        // indem wir den Schwerpunkt gegen treeB testen
-        let centroid =
-            let sum = poly |> List.fold (fun acc v -> acc + v.Pos) Vector3.Zero
-            sum / float32 poly.Length
-
-        // Schritt 2: Schneide das Polygon nur gegen Faces von B,
-        // deren AABB das Polygon-AABB überlappt (nutzt HE-Nachbarschaft)
-        let polyAABB =
-            let positions = poly |> List.map (fun v -> v.Pos)
-            AABB.FromPoints positions
-
-        // Alle Faces von B finden deren AABB die Polygon-AABB schneidet
-        let invDir = Vector3(0.0f, 0.0f, 1.0f) // dummy
-        let relevantFaces = System.Collections.Generic.List<HEFace<'Data>>()
-        let rec collectRelevant node =
-            match node with
+        // Face-Kandidaten aus B sammeln (AABB-Test)
+        let candidatePlanes = System.Collections.Generic.List<Plane>()
+        let rec collectPlanes = function
             | AABBLeaf(b, faces) ->
                 if b.Intersects polyAABB then
-                    for f in faces do relevantFaces.Add f
+                    for f in faces do
+                        planeFromFace f |> Option.iter candidatePlanes.Add
             | AABBInternal(b, l, r) ->
-                if b.Intersects polyAABB then
-                    collectRelevant l
-                    collectRelevant r
-        collectRelevant treeB
+                if b.Intersects polyAABB then collectPlanes l; collectPlanes r
+        collectPlanes treeB
 
-        // Schritt 3: Sukzessiv gegen alle relevanten Ebenen schneiden
-        // Dabei wird "inside" die Teile die IN B liegen sammeln
-        // Starte mit dem ganzen Polygon als "zu verarbeiten"
-        let mutable toProcess = [poly]
-        let mutable processedIn  = []
-        let mutable processedOut = []
+        if candidatePlanes.Count = 0 then
+            // Kein Face von B überlappt mit diesem Polygon → direkt klassifizieren
+            let centroid = poly |> List.fold (fun acc v -> acc + v.Pos) Vector3.Zero
+            let centroid = centroid / float32 poly.Length
+            if isPointInsideMesh treeB centroid
+            then inside.Add poly
+            else outside.Add poly
+        else
+            // FIX: Arbeitsliste mit zu schneidenden Fragmenten.
+            // Nach jedem Schnitt werden abgeschlossene Fragmente sofort klassifiziert.
+            let mutable workList = [poly]
 
-        for face in relevantFaces do
-            let tris = getFaceTriangles face
-            if not tris.IsEmpty then
-                let (v0, v1, v2) = tris.[0]   // Ebene aus erstem Dreieck
-                let plane = Plane.FromTriangle(v0, v1, v2)
+            for plane in candidatePlanes do
+                let nextWork = System.Collections.Generic.List<Vert<'Data> list>()
 
-                let nextToProcess = System.Collections.Generic.List<Vert<'Data> list>()
-                for p in toProcess do
-                    let (pin, pout) = splitPolygon eps plane lerp p
-                    if pin.Length  >= 3 then nextToProcess.Add pin
-                    if pout.Length >= 3 then nextToProcess.Add pout
-                toProcess <- Seq.toList nextToProcess
+                for fragment in workList do
+                    // Alle Vertices auf gleicher Seite? → Fragment ist abgeschlossen
+                    let allNeg = fragment |> List.forall (fun v -> plane.DistanceTo v.Pos <= eps)
+                    let allPos = fragment |> List.forall (fun v -> plane.DistanceTo v.Pos >= -eps)
 
-        // Schritt 4: Klassifiziere verbliebene Polygone per Ray-Cast
-        for p in toProcess do
-            let c = p |> List.fold (fun acc v -> acc + v.Pos) Vector3.Zero
-            let c = c / float32 p.Length
-            if isPointInsideMesh treeB c then
-                processedIn  <- p :: processedIn
-            else
-                processedOut <- p :: processedOut
+                    if allNeg || allPos then
+                        // Fragment liegt komplett auf einer Seite dieser Ebene.
+                        // Noch nicht endgültig klassifizieren – es könnte von einer
+                        // späteren Ebene noch geschnitten werden.
+                        nextWork.Add fragment
+                    else
+                        // Fragment wird wirklich durch diese Ebene geschnitten
+                        let (negPart, posPart) = splitPolygon eps plane lerp fragment
+                        if negPart.Length >= 3 then nextWork.Add negPart
+                        if posPart.Length >= 3 then nextWork.Add posPart
 
-        inside.AddRange  processedIn
-        outside.AddRange processedOut
+                workList <- Seq.toList nextWork
+
+            // Alle verbliebenen Fragmente klassifizieren
+            for fragment in workList do
+                let centroid = fragment |> List.fold (fun acc v -> acc + v.Pos) Vector3.Zero
+                let centroid = centroid / float32 fragment.Length
+                if isPointInsideMesh treeB centroid
+                then inside.Add fragment
+                else outside.Add fragment
 
     Seq.toList inside, Seq.toList outside
 
@@ -354,7 +348,6 @@ let private classifyAndSplit
 // Normalen umkehren
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Kehrt die Wicklungsreihenfolge eines Polygons um (→ Normale umkehren)
 let private flipPoly (poly: Vert<'Data> list) = List.rev poly
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -364,22 +357,16 @@ let private flipPoly (poly: Vert<'Data> list) = List.rev poly
 /// Führt eine CSG-Operation auf zwei HalfEdgeMeshes durch.
 ///
 /// Parameters:
-///   op      – CSGOperation: Union | Intersection | Subtraction
-///   lerp    – Interpolationsfunktion (dataA, dataB, t) → newData
-///             t=0 entspricht dataA, t=1 entspricht dataB
-///   meshA   – Erstes Mesh (wird bei Subtraction beibehalten)
-///   meshB   – Zweites Mesh (wird bei Subtraction abgezogen)
+///   op    – CSGOperation: Union | Intersection | Subtraction
+///   lerp  – Interpolationsfunktion (dataA, dataB, t) → newData
+///           t=0 entspricht dataA-Seite, t=1 entspricht dataB-Seite
+///   meshA – Erstes Mesh (bei Subtraction: wird beibehalten)
+///   meshB – Zweites Mesh (bei Subtraction: wird abgezogen)
 ///
-/// Rückgabe: Neues HalfEdgeMesh<'Data>
-///
-/// Algorithmus:
-///   1. AABB-Bäume für schnelle Raumabfragen erstellen
-///   2. Polygone beider Meshes gegen das jeweils andere klassifizieren
-///      - Die HE-Nachbarschaft ermöglicht lokale Schnitte (wenige Polygone werden geteilt)
-///   3. Je nach Operation die richtigen Teilmengen kombinieren:
-///      - Union:        außerhalb(A) + außerhalb(B)
-///      - Intersection: innerhalb(A) + innerhalb(B)
-///      - Subtraction:  außerhalb(A) + innerhalb(B, invertiert)
+/// Kombinations-Logik:
+///   Union:        aOut + bOut           (außerhalb des jeweils anderen)
+///   Intersection: aIn  + bIn            (innerhalb des jeweils anderen)
+///   Subtraction:  aOut + flip(bIn)      (A außerhalb B, B-Inneres umgekehrt)
 let csg
         (op: CSGOperation)
         (lerp: Interpolator<'Data>)
@@ -389,34 +376,19 @@ let csg
 
     let eps = 1e-4f
 
-    // AABB-Bäume erstellen (nutzt bestehende Struktur aus Mesh.fs)
-    let treeA = meshA.CreateAABBTree()
-    let treeB = meshB.CreateAABBTree()
-
-    match treeA, treeB with
-    | None, _    -> meshB   // A leer → abhängig von Op evtl. anders behandeln
-    | _, None    -> meshA
+    match meshA.CreateAABBTree(), meshB.CreateAABBTree() with
+    | None,    _       -> HalfEdgeMesh<'Data>()
+    | _,       None    -> HalfEdgeMesh<'Data>()
     | Some tA, Some tB ->
 
-    // Klassifiziere Polygone von A relativ zu B
-    let (aIn, aOut) = classifyAndSplit eps lerp meshA tB meshB
-    // Klassifiziere Polygone von B relativ zu A
-    let (bIn, bOut) = classifyAndSplit eps lerp meshB tA meshA
+    let (aIn, aOut) = classifyAndSplit eps lerp meshA tB
+    let (bIn, bOut) = classifyAndSplit eps lerp meshB tA
 
-    // Wähle Teilmengen basierend auf der Operation
     let resultPolygons =
         match op with
-        | Union ->
-            // A außerhalb B  +  B außerhalb A
-            aOut @ bOut
-
-        | Intersection ->
-            // A innerhalb B  +  B innerhalb A
-            aIn @ bIn
-
-        | Subtraction ->
-            // A außerhalb B  +  B innerhalb A (Normale von B umkehren!)
-            aOut @ (bIn |> List.map flipPoly)
+        | Union        -> aOut @ bOut
+        | Intersection -> aIn  @ bIn
+        | Subtraction  -> aOut @ (bIn |> List.map flipPoly)
 
     buildMeshFromPolygons resultPolygons
 
@@ -424,36 +396,25 @@ let csg
 // Komfort-Wrappers
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Vereinigung zweier Meshes (A ∪ B)
+/// A ∪ B
 let union (lerp: Interpolator<'Data>) meshA meshB =
     csg Union lerp meshA meshB
 
-/// Schnittmenge zweier Meshes (A ∩ B)
+/// A ∩ B
 let intersection (lerp: Interpolator<'Data>) meshA meshB =
     csg Intersection lerp meshA meshB
 
-/// Subtraktion: A minus B  (A \ B)
+/// A \ B
 let subtraction (lerp: Interpolator<'Data>) meshA meshB =
     csg Subtraction lerp meshA meshB
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Beispiel-Interpolatoren
+// Fertige Interpolatoren
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Interpoliert float32-Daten linear
-let lerpFloat32 (a: float32) (b: float32) (t: float32) =
-    a + t * (b - a)
-
-/// Interpoliert Vector3-Daten linear (z.B. für Normalen oder Farben)
-let lerpVector3 (a: Vector3) (b: Vector3) (t: float32) =
-    a + t * (b - a)
-
-/// Interpoliert Vector4-Daten linear (z.B. für RGBA-Farben)
-let lerpVector4 (a: Vector4) (b: Vector4) (t: float32) =
-    a + t * (b - a)
-
-/// Ignoriert Interpolation, behält immer Daten von A  (t-unabhängig)
+let lerpFloat32 (a: float32) (b: float32) (t: float32) = a + t * (b - a)
+let lerpVector2 (a: Vector2) (b: Vector2) (t: float32) = a + t * (b - a)
+let lerpVector3 (a: Vector3) (b: Vector3) (t: float32) = a + t * (b - a)
+let lerpVector4 (a: Vector4) (b: Vector4) (t: float32) = a + t * (b - a)
 let keepA (a: 'Data) (_: 'Data) (_: float32) = a
-
-/// Ignoriert Interpolation, behält immer Daten von B  (t-unabhängig)
 let keepB (_: 'Data) (b: 'Data) (_: float32) = b

@@ -96,6 +96,8 @@ type Interface(window: Engine.Window, engine: Microsoft.Scripting.Hosting.Script
         new Engine.VertexArray(attrList, arr, primetivetype)
     member Me.getConfigPath()=
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData)
+    member Me.setTitle(title: string) =
+        window.Title <- title
     member Me.setBackgroundColor(color:Color4)=
         GL.ClearColor(color)
     member Me.setDepthTest(enable:bool)=
@@ -112,7 +114,7 @@ type Interface(window: Engine.Window, engine: Microsoft.Scripting.Hosting.Script
     member Me.CSGunion(meshA: Mesh.HalfEdgeMesh<obj>, meshB: Mesh.HalfEdgeMesh<obj>, dataFunc: Func<obj, obj, float32, obj>) =
         let df (d1: obj) (d2: obj) (t: float32) = dataFunc.Invoke(d1, d2, t)
         Mesh.CSG.union df meshA meshB
-    member Me.CSGsubstraction(meshA: Mesh.HalfEdgeMesh<obj>, meshB: Mesh.HalfEdgeMesh<obj>, dataFunc: Func<obj, obj, float32, obj>) =
+    member Me.CSGsubtraction(meshA: Mesh.HalfEdgeMesh<obj>, meshB: Mesh.HalfEdgeMesh<obj>, dataFunc: Func<obj, obj, float32, obj>) =
         let df (d1: obj) (d2: obj) (t: float32) = dataFunc.Invoke(d1, d2, t)
         Mesh.CSG.subtraction df meshA meshB
     member Me.createCubeMesh(center: Vector3, size: Vector3, data: obj) =

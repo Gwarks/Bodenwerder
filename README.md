@@ -37,8 +37,9 @@ Das Modul `Interface` (oft als `I` importiert) stellt Funktionen für Rendering,
 *   `CSGintersection(meshA: HalfEdgeMesh, meshB: HalfEdgeMesh, interpolate_func: function) -> HalfEdgeMesh`: Berechnet die Schnittmenge zweier Meshes.
 *   `CSGsubtraction(meshA: HalfEdgeMesh, meshB: HalfEdgeMesh, interpolate_func: function) -> HalfEdgeMesh`: Subtrahiert Mesh B von Mesh A.
 *   `createMeshFromSDF(min: Vector3, max: Vector3, res: Vector3i, sdf: function) -> HalfEdgeMesh`: Erzeugt ein Mesh aus einer Signed Distance Function (SDF).
-*   `createCubeMesh(center: Vector3, size: float, data: object) -> HalfEdgeMesh`: Erzeugt einen Würfel als Half-Edge Mesh.
+*   `createCubeMesh(center: Vector3, size: Vector3, data: object) -> HalfEdgeMesh`: Erzeugt einen Würfel als Half-Edge Mesh.
 *   `getConfigPath() -> string`: Liefert den Pfad zum AppData-Verzeichnis.
+*   `setTitle(title: string)`: Setzt den Titel des Fensters.
 *   `setBackgroundColor(color: Color4)`: Setzt die Clear-Color des Fensters.
 *   `setDepthTest(enable: bool)`: Aktiviert oder deaktiviert den OpenGL Depth-Test (Z-Buffer).
 *   `getJoysticks() -> list`: Liefert eine Liste aller aktiven Joysticks als Tuples `(id, name, axes, buttons)`.
@@ -73,6 +74,9 @@ Beispiel: `No matching overload found for 'Color4'. Provided: (Single, Single, S
 
 **TextRenderer**
 *   `renderText(text: string) -> Texture`: Rendert Text in eine Textur.
+
+**Texture**
+*   `Size`: `Vector2i` mit den Dimensionen der Textur.
 
 **TextureQuad**
 *   `render(texture: Texture, pos: Vector2i, window_size: Vector2i)`: Zeichnet eine Textur an einer Bildschirmposition.
