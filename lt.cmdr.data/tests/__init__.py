@@ -33,10 +33,10 @@ class Menu:
       c+=1
       c%=len(Me.options)
   def Up(Me):
-    Me.cur+=1
+    Me.cur-=1
     Me.cur%=len(Me.options)
   def Down(Me):
-    Me.cur-=1
+    Me.cur+=1
     Me.cur%=len(Me.options)
   def Action(Me):
     I.setBackgroundColor(I.Color4(0.6,0.9,1.0,0))

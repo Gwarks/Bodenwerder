@@ -1,4 +1,4 @@
-module Mesh
+namespace Mesh
 
 open OpenTK.Mathematics
 
@@ -31,6 +31,10 @@ type AABB =
     static member Merge (a: AABB) (b: AABB) =
         AABB(Vector3(min a.Min.X b.Min.X, min a.Min.Y b.Min.Y, min a.Min.Z b.Min.Z),
              Vector3(max a.Max.X b.Max.X, max a.Max.Y b.Max.Y, max a.Max.Z b.Max.Z))
+    member Me.Intersects (other: AABB) =
+        Me.Min.X <= other.Max.X && Me.Max.X >= other.Min.X &&
+        Me.Min.Y <= other.Max.Y && Me.Max.Y >= other.Min.Y &&
+        Me.Min.Z <= other.Max.Z && Me.Max.Z >= other.Min.Z
 
 type AABBNode<'Data> =
     | AABBLeaf of AABB * HEFace<'Data>[]

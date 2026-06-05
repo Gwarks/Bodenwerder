@@ -105,6 +105,16 @@ type Interface(window: Engine.Window, engine: Microsoft.Scripting.Hosting.Script
             let result = sdf.Invoke(p) :?> System.Collections.Generic.IList<obj>
             (Convert.ToSingle(result.[0]), result.[1])
         Mesh.HalfEdgeMesh<obj>.FromSDF(min, max, res, sdfWrapper)
+
+    member Me.CSGintersection(meshA: Mesh.HalfEdgeMesh<obj>, meshB: Mesh.HalfEdgeMesh<obj>, dataFunc: Func<obj, obj, float32, obj>) =
+        let df (d1: obj) (d2: obj) (t: float32) = dataFunc.Invoke(d1, d2, t)
+        Mesh.CSG.intersection df meshA meshB
+    member Me.CSGunion(meshA: Mesh.HalfEdgeMesh<obj>, meshB: Mesh.HalfEdgeMesh<obj>, dataFunc: Func<obj, obj, float32, obj>) =
+        let df (d1: obj) (d2: obj) (t: float32) = dataFunc.Invoke(d1, d2, t)
+        Mesh.CSG.union df meshA meshB
+    member Me.CSGsubstraction(meshA: Mesh.HalfEdgeMesh<obj>, meshB: Mesh.HalfEdgeMesh<obj>, dataFunc: Func<obj, obj, float32, obj>) =
+        let df (d1: obj) (d2: obj) (t: float32) = dataFunc.Invoke(d1, d2, t)
+        Mesh.CSG.subtraction df meshA meshB
     member Me.createCubeMesh(center: Vector3, size: float32, data: obj) =
         let h = size * 0.5f
         let coords = [|
