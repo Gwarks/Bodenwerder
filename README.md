@@ -13,19 +13,29 @@ Bodenwerder ist eine Grafik-Engine, die auf F# und OpenTK basiert. Sie integrier
 
 ## Coding Style
 
-Me project use Me instead of this.
+Das Projekt verwendet `Me` anstelle von `this` (F# Style und Python Konvention).
+
+## Installation & Ausführung
+
+1. Stelle sicher, dass das .NET 6.0/7.0+ SDK installiert ist.
+2. Abhängigkeiten wiederherstellen: `dotnet restore`.
+3. Die Engine startet standardmäßig die `lt.cmdr.data/main.py`.
 
 ## Python Interface API
 
-Das Modul `Interface` (in Python oft als `I` importiert) stellt Funktionen für Rendering und Ressourcenmanagement bereit.
+Das Modul `Interface` (oft als `I` importiert) stellt Funktionen für Rendering, Ressourcenmanagement und Mathematik (OpenTK) bereit.
 
 ### Basisfunktionen
 
 *   `getTextRenderer(size: float) -> TextRenderer`: Erstellt einen Renderer für Text in der angegebenen Größe.
+*   `createSurfaceRGBA(width: int, height: int) -> SKSurface`: Erstellt eine SkiaSharp-Surface im RGBA-Format.
 *   `getTextureQuad() -> TextureQuad`: Liefert ein Objekt zum Zeichnen von 2D-Texturen.
 *   `createTexture(width: int, height: int, channels: int, texels: bytes) -> Texture`: Erstellt eine Textur aus Byte-Daten.
 *   `createShaderProgram(shaders: list) -> ShaderProgram`: Erstellt ein Shader-Programm. Erwartet eine Liste von Tupeln `(SourceCode, ShaderType)`.
 *   `createVertexArray(attributes: list|dict, vertices: bytes, primitive_type: PrimitiveType) -> VertexArray`: Erstellt ein Vertex-Array (VAO) aus Attribut-Definitionen und Vertex-Daten.
+*   `CSGunion(meshA: HalfEdgeMesh, meshB: HalfEdgeMesh, interpolate_func: function) -> HalfEdgeMesh`: Berechnet die Vereinigung zweier Meshes.
+*   `CSGintersection(meshA: HalfEdgeMesh, meshB: HalfEdgeMesh, interpolate_func: function) -> HalfEdgeMesh`: Berechnet die Schnittmenge zweier Meshes.
+*   `CSGsubtraction(meshA: HalfEdgeMesh, meshB: HalfEdgeMesh, interpolate_func: function) -> HalfEdgeMesh`: Subtrahiert Mesh B von Mesh A.
 *   `createMeshFromSDF(min: Vector3, max: Vector3, res: Vector3i, sdf: function) -> HalfEdgeMesh`: Erzeugt ein Mesh aus einer Signed Distance Function (SDF).
 *   `createCubeMesh(center: Vector3, size: float, data: object) -> HalfEdgeMesh`: Erzeugt einen Würfel als Half-Edge Mesh.
 *   `getConfigPath() -> string`: Liefert den Pfad zum AppData-Verzeichnis.
@@ -50,9 +60,11 @@ Beispiel: `No matching overload found for 'Color4'. Provided: (Single, Single, S
 ### Typen und Konstanten
 
 *   `Vector2i`: OpenTK Vektor (Integer).
+*   `Vector2`: OpenTK Vektor (Float).
 *   `Vector3`: OpenTK Vektor (Float).
 *   `Vector3i`: OpenTK Vektor (Integer 3D).
 *   `Color4`: OpenTK Farbe.
+*   `Matrix4`: OpenTK 4x4 Matrix (für Transformationen, `LookAt`, `CreatePerspectiveFieldOfView`).
 *   `ShaderType`: Mapping von Shadertypen (z.B. `I.ShaderType['VertexShader']`).
 *   `PrimitiveType`: Mapping von Primitiven (z.B. `I.PrimitiveType['TriangleFan']`).
 *   `Keys`: Mapping von Tastaturtasten (z.B. `I.Keys['Space']`).
@@ -73,6 +85,7 @@ Beispiel: `No matching overload found for 'Color4'. Provided: (Single, Single, S
 **HalfEdgeMesh**
 *   `Triangulate() -> sequence`: Zerlegt das Mesh in Dreiecke. Liefert eine Liste von (x, y, z, data).
 *   `Map(mapping_func: function) -> HalfEdgeMesh`: Transformiert die Daten des Meshes unter Beibehaltung der Struktur.
+*   `CalculateVolume() -> float`: Berechnet das Volumen des geschlossenen Meshes.
 
 **VertexArray**
 *   `draw()`: Führt den Draw-Call aus.
