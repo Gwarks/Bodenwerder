@@ -106,6 +106,21 @@ type TypeWrapper(t: Type) =
     // ----------------------------
     // __call__ → Konstruktor
     // ----------------------------
+    override _.TryGetIndex(binder: GetIndexBinder, indexes: obj[], [<Out>] result: obj byref) =
+        try
+            let arr = Array.CreateInstance(t, indexes.Length)
+            for i in 0 .. indexes.Length - 1 do
+                let arg = indexes.[i]
+                let value = 
+                    if isNull arg then null
+                    elif t.IsAssignableFrom(arg.GetType()) then arg
+                    else Convert.ChangeType(arg, t)
+                arr.SetValue(value, i)
+            result <- arr
+            true
+        with _ -> 
+            false
+
     override _.TryInvoke(binder: InvokeBinder, args: obj[], [<Out>] result: obj byref) =
         let ctors = t.GetConstructors() |> Seq.cast<MethodBase>
         match findBestMethod ctors args with

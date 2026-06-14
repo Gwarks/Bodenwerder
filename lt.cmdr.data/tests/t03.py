@@ -1,11 +1,5 @@
 import Interface as I
-import clr
 import math
-import System
-
-# SkiaSharp ist in der Engine verfügbar und wird hier eingebunden
-clr.AddReference("SkiaSharp")
-from SkiaSharp import *
 
 NAME = 'Canvas Geometrie & Gradient'
 
@@ -27,26 +21,26 @@ class Test:
 
     def draw_scene(Me):
         # Hintergrund transparent löschen
-        Me.canvas.Clear(SKColors.Transparent)
+        Me.canvas.Clear(I.SKColors.Transparent)
         
-        center = SKPoint(Me.res / 2.0, Me.res / 2.0)
+        center = I.SKPoint(Me.res / 2.0, Me.res / 2.0)
         radius = Me.res * 0.45
         
         # Gemeinsamer radialer Farbverlauf für beide Formen
-        colors = System.Array[SKColor]([SKColors.Cyan, SKColors.Magenta, SKColors.Green])
-        pos = System.Array[System.Single]([0.0, 0.7, 1.0])
-        shader = SKShader.CreateRadialGradient(center, radius, colors, pos, SKShaderTileMode.Clamp)
+        colors = I.SKColor[I.SKColors.Cyan, I.SKColors.Magenta, I.SKColors.Green]
+        pos = I.Single[0.0, 0.7, 1.0]
+        shader = I.SKShader.CreateRadialGradient(center, radius, colors, pos, I.SKShaderTileMode.Clamp)
         
-        paint = SKPaint()
+        paint = I.SKPaint()
         paint.Shader = shader
         paint.IsAntialias = True
-        paint.Style = SKPaintStyle.Fill
+        paint.Style = I.SKPaintStyle.Fill
 
         # 1. Ein einfaches Polygon (Sechseck)
-        poly_path = SKPath()
+        poly_path = I.SKPath()
         sides = 6
         r = 120
-        p_center = SKPoint(Me.res * 0.35, Me.res * 0.35)
+        p_center = I.SKPoint(Me.res * 0.35, Me.res * 0.35)
         for i in range(sides):
             angle = (2.0 * math.pi * i) / sides
             x = p_center.X + r * math.cos(angle)
@@ -57,8 +51,8 @@ class Test:
         Me.canvas.DrawPath(poly_path, paint)
 
         # 2. Eine Fläche aus Splines (Bezier-Kurven)
-        spline_path = SKPath()
-        s_center = SKPoint(Me.res * 0.65, Me.res * 0.65)
+        spline_path = I.SKPath()
+        s_center = I.SKPoint(Me.res * 0.65, Me.res * 0.65)
         spline_path.MoveTo(s_center.X - 50, s_center.Y - 50)
         # QuadTo für einfache Kurven, CubicTo für komplexe Splines
         spline_path.QuadTo(s_center.X + 150, s_center.Y - 100, s_center.X + 100, s_center.Y + 100)

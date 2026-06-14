@@ -152,6 +152,15 @@ type Interface(window: Engine.Window, engine: Microsoft.Scripting.Hosting.Script
     member Me.Vector3i = Tools.TypeWrapper(typeof<Vector3i>)
     member Me.Color4 = Tools.TypeWrapper(typeof<Color4>)
     member Me.Matrix4 = Tools.TypeWrapper(typeof<Matrix4>)
+    member Me.Single = Tools.TypeWrapper(typeof<single>)
+    member Me.SKColor = Tools.TypeWrapper(typeof<SkiaSharp.SKColor>)
+    member Me.SKColors = Tools.TypeWrapper(typeof<SkiaSharp.SKColors>)
+    member Me.SKPoint = Tools.TypeWrapper(typeof<SkiaSharp.SKPoint>)
+    member Me.SKShader = Tools.TypeWrapper(typeof<SkiaSharp.SKShader>)
+    member Me.SKShaderTileMode = Tools.TypeWrapper(typeof<SkiaSharp.SKShaderTileMode>)
+    member Me.SKPaint = Tools.TypeWrapper(typeof<SkiaSharp.SKPaint>)
+    member Me.SKPaintStyle = Tools.TypeWrapper(typeof<SkiaSharp.SKPaintStyle>)
+    member Me.SKPath = Tools.TypeWrapper(typeof<SkiaSharp.SKPath>)
     member Me.Keys = (
         let d = PythonDictionary()
         for v in Enum.GetValues(typeof<Keys>) do
