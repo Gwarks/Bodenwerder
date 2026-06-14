@@ -5,7 +5,7 @@ open OpenTK.Mathematics
 open SkiaSharp
 open System.IO
    
-let private image2texture(image:SKImage):Texture=
+let image2texture(image:SKImage):Texture=
     let texData = Array.zeroCreate<byte> (image.Width * image.Height * 4)
     let pinned =
         System.Runtime.InteropServices.GCHandle.Alloc(texData, System.Runtime.InteropServices.GCHandleType.Pinned)

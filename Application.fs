@@ -50,6 +50,8 @@ type Interface(window: Engine.Window, engine: Microsoft.Scripting.Hosting.Script
 
     member Me.createSurfaceRGBA(width:int, height:int)=
         Engine.Canvas.createSurfaceRGBA(width,height)
+    member Me.image2texture(image:SkiaSharp.SKImage)=
+        Engine.Canvas.image2texture(image)
     member Me.getTextRenderer(size:float32):Engine.Canvas.TextRenderer=
         Engine.Canvas.TextRenderer(size)
     member Me.getTextureQuad()=
