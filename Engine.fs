@@ -7,6 +7,26 @@ open OpenTK.Mathematics
 open System.ComponentModel
 open System.Threading
 open OpenTK.Windowing.GraphicsLibraryFramework
+open System.Collections.Concurrent // Added this
+
+type GLResourceCollector() =
+    let resources = System.Collections.Concurrent.ConcurrentQueue<unit -> unit>()
+
+    member Me.AddResource(id: int, deleteFunc: unit -> unit) =
+        // We ignore 'id' because we only care about the order of execution
+        resources.Enqueue(deleteFunc) |> ignore
+
+    member Me.CleanupAll() =
+        // Dequeues and executes every function currently in the queue (FIFO)
+        while not (resources.IsEmpty) do
+            match resources.TryDequeue() with
+            | true, deleteFunc -> 
+                try deleteFunc() with ex -> 
+                    System.Diagnostics.Debug.WriteLine($"Error during resource cleanup: {ex.Message}")
+            | _ -> ()
+
+module Globals =
+    let resourceCollector = GLResourceCollector()
 
 type ShaderProgram(shaderz:list<string*ShaderType>)=
     let mutable shaderProgram=0
@@ -61,7 +81,7 @@ type ShaderProgram(shaderz:list<string*ShaderType>)=
                 System.Collections.Generic.KeyValuePair(name, (typ, size, location)))
         )
     override Me.Finalize()=
-        GL.DeleteProgram(shaderProgram)
+        Globals.resourceCollector.AddResource(shaderProgram, fun () -> GL.DeleteProgram(shaderProgram))
 
 type Texture()=
     let mutable texture = 0
@@ -101,7 +121,7 @@ type Texture()=
         GL.ActiveTexture(enum<TextureUnit>(int TextureUnit.Texture0 + unit))
         GL.BindTexture(TextureTarget.Texture2D, texture)
     override Me.Finalize()=
-        GL.DeleteTexture(texture)
+        Globals.resourceCollector.AddResource(texture, fun () -> GL.DeleteTexture(texture))
 
 type VertexArray(attributes:(ActiveAttribType * int * int) list, vertexs:System.Collections.Generic.IList<byte>,
         primitivetype:PrimitiveType)=
@@ -139,16 +159,16 @@ type VertexArray(attributes:(ActiveAttribType * int * int) list, vertexs:System.
                             GL.VertexAttribPointer(loc, l.Components, l.BaseType, false, stride, offset)
                         GL.EnableVertexAttribArray(loc)
                         offset <- offset + (l.Components * 4)
-        
-        GL.BindVertexArray(0)        
+
+        GL.BindVertexArray(0)
         GL.BindBuffer(BufferTarget.ArrayBuffer, 0)
     member Me.draw():unit=
         GL.BindVertexArray(vao)
         GL.DrawArrays(primitivetype, 0, vertexCount)
         GL.BindVertexArray(0)
     override Me.Finalize()=
-        GL.DeleteBuffer(vbo)
-        GL.DeleteVertexArray(vao)
+        Globals.resourceCollector.AddResource(vao, fun () -> GL.DeleteVertexArray(vao))
+        Globals.resourceCollector.AddResource(vbo, fun () -> GL.DeleteBuffer(vbo))
 
 type EngineCallbacks = {
     onRender: Vector2i -> unit
@@ -173,6 +193,7 @@ type Window()=
         handler <- Some callbacks
         GL.Viewport(0,0,Me.ClientSize.X,Me.ClientSize.Y)
         while isRunning do
+            Globals.resourceCollector.CleanupAll()
             NativeWindow.ProcessWindowEvents(false)
             if Me.IsFocused then
                 for i in 0 .. 15 do
@@ -247,6 +268,6 @@ type Window()=
         | Some handler -> handler.onKeyUp(e.Key)
         | None -> ()
 
-    override Me.OnClosing(e:CancelEventArgs)=
-        isRunning<-false
+    override Me.OnClosing(e: CancelEventArgs) =        
+        isRunning <- false
         base.OnClosing(e)
