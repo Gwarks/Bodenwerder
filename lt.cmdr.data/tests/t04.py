@@ -197,7 +197,7 @@ void main()
         min_bound = I.Vector3(-0.25, -0.5, -0.25)
         max_bound = I.Vector3(0.25, Me.wall_height + 0.5, 0.25)
         resolution = I.Vector3i(32, 192, 32)
-        print(max_bound-min_bound)
+
         wall_mesh = I.createMeshFromSDF(min_bound, max_bound, resolution, wall_sdf)
         
         # VertexArray erstellen
