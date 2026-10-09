@@ -26,6 +26,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <EmbeddedResource Include="ressourcen\NotoSans-Regular.ttf" />
+    <EmbeddedResource Include="ressourcen\NotoColorEmoji.ttf" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Content Include="lt.cmdr.data\**\*.*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>

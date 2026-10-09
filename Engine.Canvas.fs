@@ -23,8 +23,17 @@ let image2texture(image:SKImage):Texture=
     *)
 
 type private NotoFont()=
-    let typefaceLatin=SKTypeface.FromFile(Path.Combine(Path.GetDirectoryName System.Environment.ProcessPath,"lt.cmdr.data","NotoSans-Regular.ttf"))
-    let typefaceEmoji=SKTypeface.FromFile(Path.Combine(Path.GetDirectoryName System.Environment.ProcessPath,"lt.cmdr.data","NotoColorEmoji.ttf"))
+    let getResourceStream (name:string) =
+        let asm = System.Reflection.Assembly.GetExecutingAssembly()
+        let resourceNames = asm.GetManifestResourceNames()
+        match resourceNames |> Array.tryFind (fun n -> n.EndsWith(name)) with
+        | Some resourceName -> asm.GetManifestResourceStream(resourceName)
+        | None -> 
+            printfn "Resource %s not found. Available resources: %A" name resourceNames
+            raise (System.IO.FileNotFoundException(sprintf "Embedded resource %s not found" name))
+    
+    let typefaceLatin = SKTypeface.FromStream(getResourceStream("NotoSans-Regular.ttf"))
+    let typefaceEmoji = SKTypeface.FromStream(getResourceStream("NotoColorEmoji.ttf"))
     member Me.TypefaceLatin=typefaceLatin
     member Me.TypefaceEmoji=typefaceEmoji
 let private getNotoFont=Tools.WeakSingleton.get<NotoFont>
