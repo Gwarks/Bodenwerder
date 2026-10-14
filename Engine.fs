@@ -94,6 +94,7 @@ type Texture()=
         GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, int All.Nearest)
         GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, int All.Nearest)
     member Me.Size=size
+    member Me.TextureID = texture
     member Me.LoadFromByteArray(width:int, height:int, channels:int, texels:array<byte>)=
         let internalFormat, pixelFormat = 
             match channels with
@@ -169,6 +170,92 @@ type VertexArray(attributes:(ActiveAttribType * int * int) list, vertexs:System.
     override Me.Finalize()=
         Globals.resourceCollector.AddResource(vao, fun () -> GL.DeleteVertexArray(vao))
         Globals.resourceCollector.AddResource(vbo, fun () -> GL.DeleteBuffer(vbo))
+
+// Offscreen render target that renders to a texture using Framebuffer Object (FBO)
+type OffscreenRenderTarget(width: int, height: int) =
+    let mutable fbo = 0
+    let mutable textureId = 0
+    let mutable rbo = 0
+    let mutable size = Vector2i(width, height)
+    
+    do
+        // Create framebuffer
+        fbo <- GL.GenFramebuffer()
+        
+        // Create texture for color attachment
+        textureId <- GL.GenTexture()
+        GL.BindTexture(TextureTarget.Texture2D, textureId)
+        GL.TexImage2D(
+            TextureTarget.Texture2D, 0, PixelInternalFormat.Rgba,
+            width, height, 0, PixelFormat.Rgba, PixelType.UnsignedByte,
+            System.IntPtr.Zero)
+        GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, int All.Linear)
+        GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, int All.Linear)
+        GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, int All.ClampToEdge)
+        GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, int All.ClampToEdge)
+        
+        // Create renderbuffer for depth and stencil
+        rbo <- GL.GenRenderbuffer()
+        GL.BindRenderbuffer(RenderbufferTarget.Renderbuffer, rbo)
+        GL.RenderbufferStorage(RenderbufferTarget.Renderbuffer, RenderbufferStorage.Depth24Stencil8, width, height)
+        
+        // Attach texture and renderbuffer to framebuffer
+        GL.BindFramebuffer(FramebufferTarget.Framebuffer, fbo)
+        GL.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment0, TextureTarget.Texture2D, textureId, 0)
+        GL.FramebufferRenderbuffer(FramebufferTarget.Framebuffer, FramebufferAttachment.DepthStencilAttachment, RenderbufferTarget.Renderbuffer, rbo)
+        
+        // Check framebuffer completeness
+        let status = GL.CheckFramebufferStatus(FramebufferTarget.Framebuffer)
+        if status <> FramebufferErrorCode.FramebufferComplete then
+            failwith (sprintf "Framebuffer is incomplete: %A" status)
+        
+        // Reset bindings
+        GL.BindFramebuffer(FramebufferTarget.Framebuffer, 0)
+        GL.BindTexture(TextureTarget.Texture2D, 0)
+        GL.BindRenderbuffer(RenderbufferTarget.Renderbuffer, 0)
+    
+    member Me.TextureID = textureId
+    member Me.Width = size.X
+    member Me.Height = size.Y
+    member Me.Size = size
+    
+    member Me.Bind() =
+        GL.BindFramebuffer(FramebufferTarget.Framebuffer, fbo)
+        GL.Viewport(0, 0, size.X, size.Y)
+    
+    member Me.Unbind() =
+        GL.BindFramebuffer(FramebufferTarget.Framebuffer, 0)
+    
+    member Me.Resize(newWidth: int, newHeight: int) =
+        if newWidth <= 0 || newHeight <= 0 then
+            failwith "OffscreenRenderTarget dimensions must be positive"
+        
+        size <- Vector2i(newWidth, newHeight)
+        
+        // Recreate texture with new dimensions
+        GL.BindTexture(TextureTarget.Texture2D, textureId)
+        GL.TexImage2D(
+            TextureTarget.Texture2D, 0, PixelInternalFormat.Rgba,
+            newWidth, newHeight, 0, PixelFormat.Rgba, PixelType.UnsignedByte,
+            System.IntPtr.Zero)
+        
+        // Recreate renderbuffer with new dimensions
+        GL.BindRenderbuffer(RenderbufferTarget.Renderbuffer, rbo)
+        GL.RenderbufferStorage(RenderbufferTarget.Renderbuffer, RenderbufferStorage.Depth24Stencil8, newWidth, newHeight)
+        
+        // Update viewport if currently bound
+        GL.BindFramebuffer(FramebufferTarget.Framebuffer, 0)
+        GL.BindTexture(TextureTarget.Texture2D, 0)
+        GL.BindRenderbuffer(RenderbufferTarget.Renderbuffer, 0)
+    
+    member Me.BindTexture(unit: int) =
+        GL.ActiveTexture(enum<TextureUnit>(int TextureUnit.Texture0 + unit))
+        GL.BindTexture(TextureTarget.Texture2D, textureId)
+    
+    override Me.Finalize() =
+        Globals.resourceCollector.AddResource(fbo, fun () -> GL.DeleteFramebuffer(fbo))
+        Globals.resourceCollector.AddResource(textureId, fun () -> GL.DeleteTexture(textureId))
+        Globals.resourceCollector.AddResource(rbo, fun () -> GL.DeleteRenderbuffer(rbo))
 
 type EngineCallbacks = {
     onRender: Vector2i -> unit
