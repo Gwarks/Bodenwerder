@@ -171,9 +171,11 @@ type Interface(window: Engine.Window, engine: Microsoft.Scripting.Hosting.Script
 let runMain()=
     let window=new Engine.Window()
     let engine=Python.CreateEngine()
-    let dataPath = Path.Combine(Path.GetDirectoryName System.Environment.ProcessPath, "lt.cmdr.data")
+    let basePath = Path.GetDirectoryName System.Environment.ProcessPath
+    let dataPath = Path.Combine(basePath, "lt.cmdr.data")
     let searchPaths = engine.GetSearchPaths()
     searchPaths.Add(dataPath)
+    searchPaths.Add(Path.Combine(basePath, "lib"))
     engine.SetSearchPaths(searchPaths)
 
     let scope=engine.CreateScope()
