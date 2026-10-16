@@ -143,6 +143,8 @@ type Interface(window: Engine.Window, engine: Microsoft.Scripting.Hosting.Script
         let mesh = Mesh.HalfEdgeMesh<obj>()
         mesh.Build(coords, faces)
         mesh
+    member Me.createOffscreenRenderTarget(width:int, height:int) =
+        new Engine.OffscreenRenderTarget(width, height)
     member Me.getJoysticks() =
         window.GetJoystickInfos()
     member Me.PrimitiveType = Tools.TypeWrapper(typeof<PrimitiveType>)
