@@ -13,7 +13,7 @@ class BasicInput:
             def onKeyUp(Me, key): pass
             def onJoystickButtonDown(Me, id, name, button): pass
             def onJoystickButtonUp(Me, id, name, button): pass
-            def onJoystickAxis(Me, id, name, axis, value): pass
+            def onJoystickAxis(Me, id, name, axes): pass
         return c()
 
 class ConfigStateConfirm:
@@ -108,7 +108,7 @@ class BasicInputConfigurator:
     def onKeyUp(Me, key): pass
     def onJoystickButtonDown(Me, id, name, button): pass
     def onJoystickButtonUp(Me, id, name, button): pass
-    def onJoystickAxis(Me, id, name, axis, value): pass
+    def onJoystickAxis(Me, id, name, axes): pass
     def onRender(Me,size):
         Me.tq.render(Me.t_title,I.Vector2i((size.X-Me.t_title.Size.X)>>1,0),size)
         py=Me.t_title.Size.Y+4

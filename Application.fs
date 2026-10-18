@@ -145,8 +145,13 @@ type Interface(window: Engine.Window, engine: Microsoft.Scripting.Hosting.Script
         mesh
     member Me.createOffscreenRenderTarget(width:int, height:int) =
         new Engine.OffscreenRenderTarget(width, height)
+    member Me.bindScreenRenderTarget() =
+        GL.BindFramebuffer(FramebufferTarget.Framebuffer, 0)
+        GL.Viewport(0, 0, window.Size.X, window.Size.Y)
     member Me.getJoysticks() =
         window.GetJoystickInfos()
+    member Me.Texture = Tools.TypeWrapper(typeof<Engine.Texture>)
+    member Me.OffscreenRenderTarget = Tools.TypeWrapper(typeof<Engine.OffscreenRenderTarget>)
     member Me.PrimitiveType = Tools.TypeWrapper(typeof<PrimitiveType>)
     member Me.ShaderType = Tools.TypeWrapper(typeof<ShaderType>)
     member Me.Vector2i = Tools.TypeWrapper(typeof<Vector2i>)
@@ -201,7 +206,7 @@ let runMain()=
     let onKeyUp k = interfaceInstance.DoInput("onKeyUp", [| k |])
     let onJoystickButtonDown id name btn = interfaceInstance.DoInput("onJoystickButtonDown", [| id; name; btn |])
     let onJoystickButtonUp id name btn = interfaceInstance.DoInput("onJoystickButtonUp", [| id; name; btn |])
-    let onJoystickAxis id name axis value = interfaceInstance.DoInput("onJoystickAxis", [| id; name; axis; value |])
+    let onJoystickAxis id name axes = interfaceInstance.DoInput("onJoystickAxis", [| id; name; axes |])
 
     window.Run({ onRender = onRender; onKeyDown = onKeyDown; onKeyUp = onKeyUp;
       onJoystickButtonDown = onJoystickButtonDown; onJoystickButtonUp = onJoystickButtonUp;

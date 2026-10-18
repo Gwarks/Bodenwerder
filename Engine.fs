@@ -83,18 +83,33 @@ type ShaderProgram(shaderz:list<string*ShaderType>)=
     override Me.Finalize()=
         Globals.resourceCollector.AddResource(shaderProgram, fun () -> GL.DeleteProgram(shaderProgram))
 
-type Texture()=
-    let mutable texture = 0
-    let mutable size = Vector2i(0)
+type Texture internal (textureId: int, width: int, height: int, ownTexture: bool) =
+    let mutable texture = textureId
+    let mutable size = Vector2i(width, height)
+    let mutable ownTexture = ownTexture
+    
     do
-        texture<-GL.GenTexture()
-        GL.BindTexture(TextureTarget.Texture2D, texture)
-        GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, int All.Repeat)
-        GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, int All.Repeat)
-        GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, int All.Nearest)
-        GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, int All.Nearest)
-    member Me.Size=size
+        if ownTexture then
+            // Only initialize if we own the texture (i.e., we created it)
+            GL.BindTexture(TextureTarget.Texture2D, texture)
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, int All.Repeat)
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, int All.Repeat)
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, int All.Nearest)
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, int All.Nearest)
+    
+    new() = Texture(GL.GenTexture(), 0, 0, true)
+    
+    member Me.Size = size
     member Me.TextureID = texture
+    
+    /// Creates a Texture wrapper around an existing OpenGL texture ID
+    /// The texture will NOT be deleted when this object is disposed
+    static member FromTextureID(textureId: int, width: int, height: int) =
+        Texture(textureId, width, height, false)
+    
+    override Me.Finalize() =
+        if ownTexture then
+            Globals.resourceCollector.AddResource(texture, fun () -> GL.DeleteTexture(texture))
     member Me.LoadFromByteArray(width:int, height:int, channels:int, texels:array<byte>)=
         let internalFormat, pixelFormat = 
             match channels with
@@ -121,8 +136,6 @@ type Texture()=
     member Me.activate(unit:int):unit=
         GL.ActiveTexture(enum<TextureUnit>(int TextureUnit.Texture0 + unit))
         GL.BindTexture(TextureTarget.Texture2D, texture)
-    override Me.Finalize()=
-        Globals.resourceCollector.AddResource(texture, fun () -> GL.DeleteTexture(texture))
 
 type VertexArray(attributes:(ActiveAttribType * int * int) list, vertexs:System.Collections.Generic.IList<byte>,
         primitivetype:PrimitiveType)=
@@ -219,13 +232,15 @@ type OffscreenRenderTarget(width: int, height: int) =
     member Me.Height = size.Y
     member Me.Size = size
     
+    /// Returns a Texture object that wraps the color texture
+    /// The Texture uses the same underlying OpenGL texture but won't delete it
+    member Me.Texture = Texture.FromTextureID(textureId, size.X, size.Y)
+    
     member Me.Bind() =
         GL.BindFramebuffer(FramebufferTarget.Framebuffer, fbo)
         GL.Viewport(0, 0, size.X, size.Y)
-    
-    member Me.Unbind() =
-        GL.BindFramebuffer(FramebufferTarget.Framebuffer, 0)
-    
+        GL.Clear(ClearBufferMask.ColorBufferBit|||ClearBufferMask.DepthBufferBit)
+       
     member Me.Resize(newWidth: int, newHeight: int) =
         if newWidth <= 0 || newHeight <= 0 then
             failwith "OffscreenRenderTarget dimensions must be positive"
@@ -263,7 +278,7 @@ type EngineCallbacks = {
     onKeyUp: Keys -> unit
     onJoystickButtonDown: int -> string -> int -> unit
     onJoystickButtonUp: int -> string -> int -> unit
-    onJoystickAxis: int -> string -> int -> float32 -> unit
+    onJoystickAxis: int -> string -> float32 array ->unit
 }
 
 type Window()=
@@ -315,8 +330,11 @@ type Window()=
                                 callbacks.onJoystickButtonUp i name b
                             prevButtons.[b] <- isDown
 
-                        for a in 0 .. axes.Length - 1 do
-                            callbacks.onJoystickAxis i name a axes.[a]
+                        // Convert ReadOnlySpan to array for the callback
+                        let axesArray = Array.zeroCreate axes.Length
+                        for j in 0 .. axes.Length - 1 do
+                            axesArray.[j] <- axes.[j]
+                        callbacks.onJoystickAxis i name axesArray
                     else
                         lastButtonStates.Remove i |> ignore
                         joystickNames.Remove i |> ignore
