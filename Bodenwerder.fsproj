@@ -9,8 +9,8 @@
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>      
   </PropertyGroup>
 
-  <ItemGroup>
-    <Compile Include="Tools.fs" />
+  <ItemGroup><Compile Include="Tools.fs" />
+    <Compile Include="Graph.fs" />
     <Compile Include="Mesh.fs" />
     <Compile Include="Mesh.CSG.fs" />
     <Compile Include="Engine.Tools.fs" />

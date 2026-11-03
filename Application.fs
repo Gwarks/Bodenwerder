@@ -174,6 +174,8 @@ type Interface(window: Engine.Window, engine: Microsoft.Scripting.Hosting.Script
             let e = v :?> Keys
             d.[e.ToString()] <- e
         d)
+    member Me.layoutGraph() =
+        0
 
 let runMain()=
     let window=new Engine.Window()
